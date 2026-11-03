@@ -1,0 +1,83 @@
+# Intégration continue : à chaque push / pull request
+# 1. Audit de sécurité des dépendances + vérification / build de chaque service
+# 2. Build des images Docker et test de démarrage de toute la stack
+name: CI
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit-build:
+    name: Audit & build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, frontend, gateway, microservices/notifications, microservices/stock-management]
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+
+      - name: Installation des dépendances
+        run: npm ci
+
+      - name: Audit de sécurité (échec si vulnérabilité haute ou critique en production)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build du frontend
+        if: matrix.service == 'frontend'
+        run: npm run build
+
+      - name: Vérification de la syntaxe JavaScript
+        if: matrix.service != 'frontend'
+        run: find . -name '*.js' -not -path './node_modules/*' -print0 | xargs -0 -n1 node --check
+
+  docker:
+    name: Build Docker & test de la stack
+    runs-on: ubuntu-latest
+    needs: audit-build
+    env:
+      # Valeurs factices propres au CI (aucun vrai secret)
+      JWT_SECRET: ci-jwt-secret-0123456789abcdef0123456789abcdef
+      INTERNAL_API_KEY: ci-internal-key-0123456789abcdef
+      EMAIL_USER: ci@example.com
+      EMAIL_APPLICATION_PASSWORD: ci-password
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build des images
+        run: docker compose build
+
+      - name: Démarrage de la stack
+        run: docker compose up -d
+
+      - name: Attente du backend (healthcheck)
+        run: timeout 120 bash -c 'until curl -sf http://localhost:5000/api/health; do sleep 3; done'
+
+      - name: Tests de fumée
+        run: |
+          curl -sf http://localhost:3000/ > /dev/null
+          curl -sf http://localhost:5000/api/products
+          # Le gateway ne doit pas être exposé publiquement
+          ! curl -s -m 3 http://localhost:8000/health
+          # Une route protégée doit refuser un visiteur non connecté
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/api/admin/orders)" = "401"
+
+      - name: Logs en cas d'échec
+        if: failure()
+        run: docker compose logs
+
+      - name: Arrêt
+        if: always()
+        run: docker compose down -v
