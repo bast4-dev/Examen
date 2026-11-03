@@ -1,17 +1,8 @@
 // backend/seeder.js
+// Usage : npm run seed  (remplace TOUS les produits — ne pas lancer en production)
+require('dotenv').config();
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const Product = require('./models/Product'); // Assurez-vous que le chemin est correct
-
-dotenv.config();
-
-// Connexion à MongoDB
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-  .then(() => console.log('MongoDB connecté pour le seed'))
-  .catch((err) => console.error('Erreur de connexion à MongoDB', err));
+const Product = require('./models/Product');
 
 // Jeux de produits à insérer
 const products = [
@@ -50,16 +41,19 @@ const products = [
 // Fonction pour insérer les produits
 const seedProducts = async () => {
   try {
-    // Supprimer les anciens produits (optionnel)
-    await Product.deleteMany();
+    if (process.env.NODE_ENV === 'production' && process.argv[2] !== '--force') {
+      throw new Error('Seed refusé en production (ajouter --force pour passer outre)');
+    }
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log('MongoDB connecté pour le seed');
 
-    // Insérer les nouveaux produits
+    await Product.deleteMany();
     await Product.insertMany(products);
 
     console.log('Jeux de produits insérés avec succès !');
-    process.exit();
+    process.exit(0);
   } catch (error) {
-    console.error('Erreur lors de l\'insertion des produits', error);
+    console.error("Erreur lors de l'insertion des produits :", error.message);
     process.exit(1);
   }
 };

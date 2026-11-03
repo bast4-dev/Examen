@@ -1,27 +1,20 @@
 // backend/middlewares/authMiddleware.js
 const jwt = require('jsonwebtoken');
 
+// Le JWT est lu dans un cookie HttpOnly (inaccessible au JavaScript du navigateur, donc protégé du vol par XSS)
 exports.authenticateToken = (req, res, next) => {
-
-  const token = req.headers['authorization']?.split(' ')[1];
-  console.log(`token is ${token}`)
-  if (!token) return res.sendStatus(401);
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ message: 'Authentification requise' });
 
   try {
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-      if (err) {
-        console.error('Erreur de vérification du token upd');
-        return res.status(403).json({ error: true, message: 'Token invalide upd' });
-      }
-      req.user = user;
-      next();
-    });
-  } catch (error) { 
-    return res.status(403).json({ error: true, message: 'Token invalide' });
+    req.user = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    next();
+  } catch {
+    return res.status(401).json({ message: 'Session invalide ou expirée' });
   }
 };
 
 exports.isAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Accès interdit' });
+  if (req.user?.role !== 'admin') return res.status(403).json({ message: 'Accès interdit' });
   next();
 };

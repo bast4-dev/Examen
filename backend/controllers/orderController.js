@@ -1,194 +1,98 @@
 // backend/controllers/orderController.js
-const axios = require('axios');
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
-const orderLog = require('debug')('orderRoutes:console')
+const Product = require('../models/Product');
+const User = require('../models/User');
+const logger = require('../utils/logger');
+const HttpError = require('../utils/httpError');
+const { sendEmail, notifyStockUpdate } = require('../services/notificationService');
 
+// Réserve le stock de façon atomique : la mise à jour n'a lieu que si le stock est suffisant,
+// ce qui empêche la survente même avec des commandes simultanées.
+const reserveStock = async (productId, quantity) => {
+  const product = await Product.findOneAndUpdate(
+    { _id: productId, stock: mongoose.trusted({ $gte: quantity }) },
+    { $inc: { stock: -quantity } },
+    { new: true }
+  );
+  if (product) return product;
+
+  const exists = await Product.exists({ _id: productId });
+  throw exists
+    ? new HttpError(409, 'Stock insuffisant pour un des produits de la commande')
+    : new HttpError(404, "Un des produits de la commande n'existe plus");
+};
+
+const releaseStock = (reserved) =>
+  Promise.all(reserved.map(({ productId, quantity }) => Product.updateOne({ _id: productId }, { $inc: { stock: quantity } })));
 
 exports.createOrder = async (req, res) => {
-  //userLog(`user is ${JSON.stringify(req.user)}`)
-  console.log(`user is in createOrder ${JSON.stringify(req.user)}`)
-  //const { items, shippingAddress, paymentMethod } = req.body;
-  const { items, shippingAddress, paymentMethod, shippingMethod, } = req.body;
-  console.log(`items are ${JSON.stringify(req.body)}`)
-  //const { items } = req.body;
-  let userId = req.user.userId;
-  // let shippingAddress = {
-  //   "street": "123 Main St",
-  //   "city": "New York",
-  //   "postalCode": "10001",
-  //   "country": "USA"
-  // };
+  const { items, shippingAddress, paymentMethod, shippingMethod } = req.body;
 
-  // let paymentMethod =  "Carte bancaire";
-
-
-  // Vérification du format des données
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({
-      message: 'Le corps de la requête doit contenir un tableau d\'objets { productId, quantity }.',
-    });
+  // Regroupe les lignes portant sur le même produit
+  const quantities = new Map();
+  for (const { productId, quantity } of items) {
+    quantities.set(productId, (quantities.get(productId) || 0) + quantity);
   }
 
+  const reserved = [];
+  const reservedProducts = [];
+  let order;
   try {
-    // Logique pour préparer les détails de la commande
-    const orderDetails = items.map(({ productId, quantity, price }) => {
-      console.log(`Produit ID : ${productId}, Quantité : ${quantity}, Price ${price}`);
-      return { productId, quantity, price };
-    });
+    for (const [productId, quantity] of quantities) {
+      const product = await reserveStock(productId, quantity);
+      reserved.push({ productId, quantity });
+      reservedProducts.push(product);
+    }
 
-    // Création de la commande dans la base de données
-    const total = items.reduce(
-      (acc, { price, quantity }) => acc + price * quantity,
-      0
-    );
+    // Le prix vient TOUJOURS de la base, jamais du client
+    const orderItems = reservedProducts.map((product, i) => ({
+      productId: product._id,
+      quantity: reserved[i].quantity,
+      price: product.price,
+    }));
+    const total = Math.round(orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0) * 100) / 100;
 
-    const newOrder = new Order({
-      userId,
-      items: orderDetails,
+    order = await Order.create({
+      userId: req.user.userId,
+      items: orderItems,
       total,
       shippingAddress,
       paymentMethod,
-      shippingMethod
-    });
-
-    // Sauvegarder la commande dans la base de données
-    const savedOrder = await newOrder.save();
-
-    console.log('Commande sauvegardée :', savedOrder);
-
-    // Appel au micro-service de notification
-    try {
-      await axios.post('http://localhost:8000/notify', {
-        to: 'syaob@yahoo.fr',
-        subject: 'Nouvelle Commande Créée',
-        text: `Une commande a été créée avec succès pour les produits suivants : \n${orderDetails
-          .map((item) => `Produit ID : ${item.productId}, Quantité : ${item.quantity}`)
-          .join('\n')}`,
-      });
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi de la notification', error);
-    }
-
-    // Appel au micro-service de gestion des stocks
-    // try {
-    //   await Promise.all(
-    //     items.map(({ productId, quantity }) =>
-    //       axios.post('http://localhost:8000/update-stock', { productId, quantity })
-    //     )
-    //   );
-    // } catch (error) {
-    //   console.error('Erreur lors de la mise à jour des stocks', error);
-    // }
-
-    // Réponse de succès
-    res.status(201).json({
-      message: 'Commande créée avec succès',
-      order: savedOrder,
+      shippingMethod,
     });
   } catch (error) {
-    console.error('Erreur lors de la création de la commande', error);
-    res.status(500).json({
-      message: 'Une erreur est survenue lors de la création de la commande.',
-    });
+    // Échec : on rend le stock déjà réservé
+    if (reserved.length > 0) await releaseStock(reserved);
+    throw error;
   }
-};
 
+  logger.info('Commande créée', { orderId: order._id, userId: req.user.userId, total: order.total });
+  res.status(201).json({ message: 'Commande créée avec succès', order });
 
-// exports.createOrder = async (req, res) => {
-//     const products = req.body; // Attente d'un tableau d'objets { productId, quantity }
-//     console.log(`products are ${JSON.stringify(products)}`)
-    
-//     // // Vérification du format des données
-//     if (!Array.isArray(products.items) || products.items.length === 0) {
-//       return res.status(400).json({ message: 'Le corps de la requête doit contenir un tableau d\'objets { productId, quantity }.' });
-//     }
-  
-//     try {
-//     //   // Logique pour traiter chaque produit de la commande
-//       const orderDetails = products.items.map(({ productId, quantity }) => {
-//         console.log(`Produit ID : ${productId}, Quantité : ${quantity}`);
-//         return { productId, quantity };
-//       });
-
-//       //TODO : requete avec le modele order pour ajouter les commande en db
-  
-//     //   // Appel au micro-service de notification
-//       try {
-//         await axios.post('http://localhost:8000/notify', {
-//           to: "syaob@yahoo.fr",
-//           subject: 'Nouvelle Commande Créée',
-//           text: `Une commande a été créée avec succès pour les produits suivants : \n${orderDetails
-//             .map((item) => `Produit ID : ${item.productId}, Quantité : ${item.quantity}`)
-//             .join('\n')}`,
-//         });
-//       } catch (error) {
-//         console.error('Erreur lors de l\'envoi de la notification', error);
-//       }
-  
-//       // Appel au micro-service de gestion des stocks
-//       try {
-//         await Promise.all(
-//           products.items.map(({ productId, quantity }) =>
-//             axios.post('http://localhost:8000/update-stock', { productId, quantity })
-//           )
-//         );
-//       } catch (error) {
-//         console.error('Erreur lors de la mise à jour des stocks', error);
-//       }
-  
-//       // Réponse de succès
-//       res.status(201).json({
-//         message: 'Commande créée avec succès',
-//         orderDetails,
-//       });
-//     } catch (error) {
-//       console.error('Erreur lors de la création de la commande', error);
-//       res.status(500).json({ message: 'Une erreur est survenue lors de la création de la commande.' });
-//     }
-//   };
-
-exports.deleteOrder = async(req, res)=>{
-    const { orderId } = req.body;
-    console.log(`orderId to delete is ${orderId}`)
-}
-
-exports.getOrders = async(req, res)=>{
-
-  const orders = await Order.find();
-      res.status(200).json(orders);
- 
-}
-
-exports.validateOrder = async (req, res) => {
-  const { orderId } = req.body;
-  res.status(200).json({message: `Commande ${orderId} validée avec succès.`})
-}
-
-exports.updateOrderStatus = async (req, res) => {
-  const { orderId } = req.params;
-  const { status } = req.body;
-
-  console.log(`dump console log order id => ${orderId} status = ${status}`);
+  // Notifications après la réponse : elles ne retardent ni ne font échouer la commande
   try {
-    // Vérification des données
-    if (!status) {
-      return res.status(400).json({ message: "Le statut est requis." });
-    }
-
-    // Recherche de la commande et mise à jour
-    const order = await Order.findByIdAndUpdate(
-      orderId,
-      { status, updatedAt: new Date() }, // Mise à jour du statut et de la date de modification
-      { new: true } // Retourne la commande mise à jour
-    );
-
-    if (!order) {
-      return res.status(404).json({ message: "Commande non trouvée." });
-    }
-
-    res.status(200).json({ message: "Statut mis à jour avec succès", order });
+    const user = await User.findById(req.user.userId).select('email username');
+    const lines = reservedProducts.map((p, i) => `- ${p.name} x${reserved[i].quantity} : ${p.price} €`).join('\n');
+    sendEmail({
+      to: user?.email,
+      subject: 'Confirmation de votre commande',
+      text: `Bonjour ${user?.username},\n\nVotre commande n°${order._id} a bien été enregistrée :\n${lines}\n\nTotal : ${order.total} €`,
+    });
+    sendEmail({
+      to: process.env.ADMIN_EMAIL,
+      subject: 'Nouvelle commande créée',
+      text: `Nouvelle commande n°${order._id} de ${user?.username} :\n${lines}\n\nTotal : ${order.total} €`,
+    });
+    reservedProducts.forEach((p) => notifyStockUpdate(p._id, p.stock));
   } catch (error) {
-    console.error("Erreur lors de la mise à jour de la commande :", error);
-    res.status(500).json({ message: "Erreur serveur." });
+    logger.error("Échec de l'envoi des notifications de commande", { orderId: order._id, error: error.message });
   }
 };
+
+exports.getMyOrders = async (req, res) => {
+  const orders = await Order.find({ userId: req.user.userId }).sort({ createdAt: -1 });
+  res.json(orders);
+};
+
+exports.releaseStock = releaseStock;

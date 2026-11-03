@@ -1,46 +1,60 @@
-// notifi/server.js
+// microservices/notifications/index.js
 const express = require('express');
-const bodyParser = require('body-parser');
+const crypto = require('crypto');
 const nodemailer = require('nodemailer');
-require('dotenv').config()
-//console.log(`process evn is ${JSON.stringify(process.env)}`)
+require('dotenv').config();
+
+const { EMAIL_USER, EMAIL_APPLICATION_PASSWORD, INTERNAL_API_KEY } = process.env;
+if (!EMAIL_USER || !EMAIL_APPLICATION_PASSWORD || !INTERNAL_API_KEY) {
+  console.error('Configuration incomplète : EMAIL_USER, EMAIL_APPLICATION_PASSWORD et INTERNAL_API_KEY sont obligatoires');
+  process.exit(1);
+}
 
 const app = express();
-app.use(bodyParser.json());
+app.disable('x-powered-by');
+app.use(express.json({ limit: '20kb' }));
 
-// Configuration de Nodemailer
+// Configuration de Nodemailer (les identifiants ne sont jamais journalisés)
 const transporter = nodemailer.createTransport({
   service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER, // Adresse Gmail
-    pass: process.env.EMAIL_APPLICATION_PASSWORD, // Mot de passe spécifique à l'application
-  },
+  auth: { user: EMAIL_USER, pass: EMAIL_APPLICATION_PASSWORD },
 });
 
-console.log(`rocess.env.EMAIL_USER is ${process.env.EMAIL_USER} process.env.EMAIL_APPLICATION_PASSWORD is ${process.env.EMAIL_APPLICATION_PASSWORD}`);
+app.get('/health', (req, res) => res.json({ status: 'ok', service: 'notifications', uptime: Math.round(process.uptime()) }));
+
+// Défense en profondeur : la clé est revérifiée même derrière le gateway
+const expectedKey = Buffer.from(INTERNAL_API_KEY);
+app.use((req, res, next) => {
+  const key = Buffer.from(req.get('x-api-key') || '');
+  if (key.length !== expectedKey.length || !crypto.timingSafeEqual(key, expectedKey)) {
+    return res.status(401).json({ message: 'Clé API invalide' });
+  }
+  next();
+});
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // Route pour envoyer un email
 app.post('/notify', async (req, res) => {
-  const { to, subject, text } = req.body;
-  console.log(`to is ${to} subject is ${subject} text is ${text}`)
+  const { to, subject, text } = req.body || {};
 
-  //const { message } = req.body;
-    //console.log(`Notification: ${text}`);
-    //res.send('Notification envoyée mail');
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to,
-    subject,
-    text,
-  };
+  if (typeof to !== 'string' || !EMAIL_REGEX.test(to) || to.length > 254) {
+    return res.status(400).json({ message: 'Destinataire invalide.' });
+  }
+  if (typeof subject !== 'string' || !subject.trim() || subject.length > 200 || /[\r\n]/.test(subject)) {
+    return res.status(400).json({ message: 'Sujet invalide.' });
+  }
+  if (typeof text !== 'string' || !text.trim() || text.length > 10_000) {
+    return res.status(400).json({ message: 'Contenu invalide.' });
+  }
 
   try {
-    await transporter.sendMail(mailOptions);
-    console.log('Email envoyé avec succès');
+    await transporter.sendMail({ from: EMAIL_USER, to, subject, text });
+    console.log(`Email envoyé : « ${subject} »`);
     return res.status(200).json({ message: 'Email envoyé avec succès.' });
   } catch (error) {
-    console.error('Erreur lors de l\'envoi de l\'email', error);
-    return res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'email.', error });
+    console.error("Erreur lors de l'envoi de l'email :", error.message);
+    return res.status(502).json({ message: "Erreur lors de l'envoi de l'email." });
   }
 });
 

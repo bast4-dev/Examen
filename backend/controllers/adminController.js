@@ -1,16 +1,30 @@
 // backend/controllers/adminController.js
-const axios = require('axios');
-const Order = require('../models/Order'); // Modèle pour les commandes
-const Product = require('../models/Product'); // Modèle pour les produits
+const Order = require('../models/Order');
+const Product = require('../models/Product');
+const User = require('../models/User');
+const logger = require('../utils/logger');
+const HttpError = require('../utils/httpError');
+const { sendEmail, notifyStockUpdate } = require('../services/notificationService');
+const { releaseStock } = require('./orderController');
+
+// Appelée après l'envoi de la réponse : ne doit jamais lever d'erreur
+const notifyCustomer = async (order) => {
+  try {
+    const user = await User.findById(order.userId).select('email username');
+    await sendEmail({
+      to: user?.email,
+      subject: `Votre commande est « ${order.status} »`,
+      text: `Bonjour ${user?.username},\n\nLe statut de votre commande n°${order._id} est désormais : ${order.status}.`,
+    });
+  } catch (error) {
+    logger.error('Échec de la notification client', { orderId: order._id, error: error.message });
+  }
+};
 
 // Récupérer toutes les commandes
 exports.getOrders = async (req, res) => {
-  try {
-    const orders = await Order.find();
-    res.json(orders);
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des commandes' });
-  }
+  const orders = await Order.find().sort({ createdAt: -1 });
+  res.json(orders);
 };
 
 // Changer l'état d'une commande
@@ -18,40 +32,46 @@ exports.updateOrderStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  try {
-    await Order.findByIdAndUpdate(id, { status });
-    await axios.post('http://localhost:3001/notify', {
-      message: `Le statut de la commande ${id} a été mis à jour en "${status}".`,
-    });
-    res.json({ message: `Statut de la commande ${id} mis à jour` });
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur de mise à jour du statut de la commande' });
+  const order = await Order.findById(id);
+  if (!order) throw new HttpError(404, 'Commande non trouvée');
+  if (order.status === 'Annulée') throw new HttpError(409, 'Une commande annulée ne peut plus changer de statut');
+
+  // Une annulation remet les produits en stock
+  if (status === 'Annulée') {
+    await releaseStock(order.items.map(({ productId, quantity }) => ({ productId, quantity })));
   }
+
+  order.status = status;
+  await order.save();
+
+  logger.info('Statut de commande modifié', { orderId: id, status, adminId: req.user.userId });
+  res.json({ message: 'Statut mis à jour avec succès', order });
+  notifyCustomer(order);
 };
 
-// Valider une commande
+// Valider une commande : « En attente » -> « En cours de traitement »
 exports.validateOrder = async (req, res) => {
   const { id } = req.params;
 
-  try {
-    await Order.findByIdAndUpdate(id, { status: 'Validée' });
-    await axios.post('http://localhost:3001/notify', {
-      message: `La commande ${id} a été validée.`,
-    });
-    res.json({ message: `Commande ${id} validée` });
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la validation de la commande' });
+  const order = await Order.findOneAndUpdate(
+    { _id: id, status: 'En attente' },
+    { status: 'En cours de traitement' },
+    { new: true }
+  );
+  if (!order) {
+    const exists = await Order.exists({ _id: id });
+    throw exists ? new HttpError(409, 'Seule une commande en attente peut être validée') : new HttpError(404, 'Commande non trouvée');
   }
+
+  logger.info('Commande validée', { orderId: id, adminId: req.user.userId });
+  res.json({ message: `Commande ${id} validée`, order });
+  notifyCustomer(order);
 };
 
 // Récupérer tous les produits
 exports.getProducts = async (req, res) => {
-  try {
-    const products = await Product.find();
-    res.json(products);
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des produits' });
-  }
+  const products = await Product.find().sort({ name: 1 });
+  res.json(products);
 };
 
 // Mettre à jour le stock d'un produit
@@ -59,13 +79,10 @@ exports.updateProductStock = async (req, res) => {
   const { id } = req.params;
   const { stock } = req.body;
 
-  try {
-    await Product.findByIdAndUpdate(id, { stock });
-    await axios.post('http://localhost:3001/notify', {
-      message: `Le stock du produit ${id} a été mis à jour à ${stock}.`,
-    });
-    res.json({ message: `Stock du produit ${id} mis à jour` });
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la mise à jour du stock du produit' });
-  }
+  const product = await Product.findByIdAndUpdate(id, { stock }, { new: true, runValidators: true });
+  if (!product) throw new HttpError(404, 'Produit non trouvé');
+
+  logger.info('Stock mis à jour', { productId: id, stock, adminId: req.user.userId });
+  res.json({ message: 'Stock mis à jour avec succès', product });
+  notifyStockUpdate(product._id, product.stock);
 };

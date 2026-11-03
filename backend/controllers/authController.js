@@ -1,70 +1,69 @@
 // backend/controllers/authController.js
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const User = require('../models/User'); // modèle utilisateur
-require('dotenv').config();
-const axios = require('axios');
-const authLog = require('debug')('authRoutes:console')
-//const sendEmail = require('../services/emailService');
+const User = require('../models/User');
+const logger = require('../utils/logger');
+const HttpError = require('../utils/httpError');
+const { sendEmail } = require('../services/notificationService');
+
+const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 heure
+
+const cookieOptions = () => ({
+  httpOnly: true, // inaccessible depuis JavaScript (protection XSS)
+  secure: process.env.NODE_ENV === 'production', // HTTPS uniquement en production
+  sameSite: 'strict', // non envoyé par des sites tiers (protection CSRF)
+  path: '/',
+  ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
+});
 
 exports.login = async (req, res) => {
   const { username, password } = req.body;
-  authLog(`username is ${username} password is ${password}`);
 
-
-  try {
-    const user = await User.findOne({ username });
-    authLog(`user is ${JSON.stringify(user)}`)
-    if (!user) return res.status(400).json({ message: 'Utilisateur non trouvé' });
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Mot de passe incorrect' });
-
-    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    authLog(`token is ${token}`)
-
-    res.json({ token, role: user.role, username: user.username });
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur serveur' });
+  const user = await User.findOne({ username });
+  // Même réponse que l'utilisateur existe ou non (pas d'énumération des comptes)
+  if (!user || !(await user.comparePassword(password))) {
+    logger.warn('Échec de connexion', { username, ip: req.ip });
+    throw new HttpError(401, 'Identifiants invalides');
   }
+
+  const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: TOKEN_TTL_MS / 1000,
+    algorithm: 'HS256',
+  });
+
+  res.cookie('token', token, { ...cookieOptions(), maxAge: TOKEN_TTL_MS });
+  logger.info('Connexion réussie', { userId: user._id, role: user.role });
+  res.json({ username: user.username, role: user.role });
 };
 
+exports.logout = (req, res) => {
+  res.clearCookie('token', cookieOptions());
+  res.json({ message: 'Déconnecté' });
+};
+
+// Permet au frontend de connaître la session en cours (le cookie n'est pas lisible en JavaScript)
+exports.me = async (req, res) => {
+  const user = await User.findById(req.user.userId).select('username email role');
+  if (!user) throw new HttpError(401, 'Session invalide');
+  res.json({ username: user.username, email: user.email, role: user.role });
+};
 
 exports.register = async (req, res) => {
   const { username, email, password } = req.body;
-  authLog(`username is ${username} email is ${email} password is ${password}`);
 
-  try {
-    // Vérifier si l'email ou le nom d'utilisateur existe déjà
-    const existingUser = await User.findOne({ email });
-    
-    if (existingUser) {
-      authLog(`user exist => ${JSON.stringify(existingUser)}`)
-      return res.status(400).json({ message: 'Cet email est déjà utilisé.' });
-    }
-
-    // Créer un nouvel utilisateur
-    const user = new User({ username, email, password });
-    await user.save();
-
-    authLog(`user after creation => ${JSON.stringify(user)}`)
-
-    // Envoyer un email de bienvenue
-    // await sendEmail(
-    //   email,
-    //   'Bienvenue dans notre application',
-    //   `Bonjour ${username},\n\nMerci de vous être inscrit. Nous sommes ravis de vous accueillir !`
-    // );
-
-    // await axios.post('http://localhost:4002/notify', {
-    //   to: email,
-    //   subject: 'Bienvenue dans notre application',
-    //   text: `Bonjour ${username},\n\nMerci de vous être inscrit. Nous sommes ravis de vous accueillir !`,
-    // });
-
-    res.status(201).json({ message: 'Utilisateur créé avec succès.' });
-  } catch (error) {
-    console.error('Erreur lors de l\'inscription', error);
-    res.status(500).json({ message: 'Une erreur est survenue.' });
+  const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+  if (existingUser) {
+    throw new HttpError(409, "Ce nom d'utilisateur ou cet email est déjà utilisé.");
   }
+
+  // Le rôle n'est jamais repris de la requête : tout nouveau compte est un simple utilisateur
+  const user = await User.create({ username, email, password });
+  logger.info('Nouvel utilisateur inscrit', { userId: user._id });
+
+  sendEmail({
+    to: email,
+    subject: 'Bienvenue dans notre application',
+    text: `Bonjour ${username},\n\nMerci de vous être inscrit. Nous sommes ravis de vous accueillir !`,
+  });
+
+  res.status(201).json({ message: 'Utilisateur créé avec succès.' });
 };

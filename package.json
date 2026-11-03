@@ -1,10 +1,17 @@
 {
+  "name": "exam1",
+  "private": true,
   "scripts": {
     "start:notifications": "nodemon microservices/notifications/index.js",
     "start:stock-management": "nodemon microservices/stock-management/index.js",
     "start:gateway": "nodemon gateway/server.js",
     "start:backend": "nodemon backend/server.js",
-    "start:frontend": "npm --prefix frontend start",
-    "start:all": "npm-run-all --parallel start:notifications start:stock-management start:gateway start:backend start:frontend"
+    "start:frontend": "npm --prefix frontend run dev",
+    "start:all": "npm-run-all --parallel start:notifications start:stock-management start:gateway start:backend start:frontend",
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install && npm --prefix gateway install && npm --prefix microservices/notifications install && npm --prefix microservices/stock-management install"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "npm-run-all2": "^9.0.4"
   }
 }

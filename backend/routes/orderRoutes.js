@@ -1,15 +1,16 @@
 // backend/routes/orderRoutes.js
 const express = require('express');
-const { createOrder, deleteOrder, getOrders, validateOrder, updateOrderStatus } = require('../controllers/orderController');
-const { authenticateToken, isAdmin } = require('../middlewares/authMiddleware');
+const { createOrder, getMyOrders } = require('../controllers/orderController');
+const { authenticateToken } = require('../middlewares/authMiddleware');
+const validate = require('../middlewares/validate');
+const asyncHandler = require('../utils/asyncHandler');
+const schemas = require('../validators/schemas');
 
 const router = express.Router();
 
-router.get('/', authenticateToken, isAdmin, getOrders); // Accès pour administrateurs
-router.post('/', authenticateToken, createOrder); // Accès pour utilisateurs connectés
-router.delete('/:id', authenticateToken, deleteOrder); // Accès pour administrateurs
-router.put('/:id/validate', authenticateToken, isAdmin, validateOrder); // Accès pour administrateurs
-router.put('/:orderId/status', authenticateToken, isAdmin, updateOrderStatus); // Accès pour administrateurs
-
+// Accès réservé aux utilisateurs connectés (les routes d'administration sont dans adminRoutes.js)
+router.use(authenticateToken);
+router.get('/mine', asyncHandler(getMyOrders));
+router.post('/', validate(schemas.createOrder), asyncHandler(createOrder));
 
 module.exports = router;

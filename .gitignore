@@ -12,6 +12,7 @@ docker-compose.override.yml
 
 # Logs
 *.log
+logs/
 
 # IDE
 .vscode/
@@ -27,3 +28,6 @@ data/db/
 
 # Autre
 .DS_Store
+
+# Dossier de rendu (contient des captures sensibles)
+docs/*.docx

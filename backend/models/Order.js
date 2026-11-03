@@ -15,6 +15,7 @@ const orderItemSchema = new mongoose.Schema({
   price: {
     type: Number,
     required: true,
+    min: 0,
   },
 });
 
@@ -30,6 +31,7 @@ const orderSchema = new mongoose.Schema(
     total: {
       type: Number,
       required: true,
+      min: 0,
     },
     status: {
       type: String,
@@ -51,14 +53,6 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: ['colissimo', 'chronopost'],
       required: true,
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
     },
   },
   {
