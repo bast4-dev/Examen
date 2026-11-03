@@ -17,10 +17,17 @@ app.disable('x-powered-by');
 app.use(express.json({ limit: '20kb' }));
 
 // Configuration de Nodemailer (les identifiants ne sont jamais journalisés)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: EMAIL_USER, pass: EMAIL_APPLICATION_PASSWORD },
-});
+// SMTP_HOST/SMTP_PORT permettent d'utiliser n'importe quel serveur SMTP ; Gmail par défaut
+const transporter = nodemailer.createTransport(
+  process.env.SMTP_HOST
+    ? {
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: Number(process.env.SMTP_PORT) === 465,
+        auth: { user: EMAIL_USER, pass: EMAIL_APPLICATION_PASSWORD },
+      }
+    : { service: 'gmail', auth: { user: EMAIL_USER, pass: EMAIL_APPLICATION_PASSWORD } }
+);
 
 app.get('/health', (req, res) =>
   res.json({ status: 'ok', service: 'notifications', uptime: Math.round(process.uptime()) })

@@ -26,7 +26,17 @@ docker compose exec -e ADMIN_USERNAME=admin -e ADMIN_EMAIL=admin@example.com -e 
 
 Application : http://localhost:3000 — santé de l'API : http://localhost:5000/api/health
 
-Sans identifiants SMTP valides (`EMAIL_USER`, `EMAIL_APPLICATION_PASSWORD`), l'application fonctionne normalement : les e-mails échouent et sont simplement journalisés.
+### E-mails (SMTP)
+
+⚠️ **Le compte SMTP Gmail fourni avec le sujet n'est plus valide** : Gmail refuse ses identifiants (`535-5.7.8 Username and Password not accepted`), son mot de passe d'application ayant vraisemblablement été révoqué. Le microservice de notification accepte donc n'importe quel serveur SMTP via `SMTP_HOST` / `SMTP_PORT` (Gmail si vide). La préproduction et la production utilisent un SMTP de test, [Ethereal](https://ethereal.email), qui reçoit réellement les e-mails envoyés et les affiche dans une boîte web, sans les distribuer.
+
+Pour créer un compte Ethereal de test :
+
+```bash
+cd microservices/notifications && node -e "require('nodemailer').createTestAccount().then(a => console.log(a.user, a.pass))"
+```
+
+Puis dans `.env` : `SMTP_HOST=smtp.ethereal.email`, `SMTP_PORT=587`, `EMAIL_USER=<user>`, `EMAIL_APPLICATION_PASSWORD=<pass>`. Sans SMTP valide, l'application fonctionne normalement : les envois échouent et sont simplement journalisés.
 
 ## Démarrage sans Docker
 
