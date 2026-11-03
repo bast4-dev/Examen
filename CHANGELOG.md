@@ -22,6 +22,7 @@ Les références (S1, B4…) renvoient au rapport d'audit [`docs/AUDIT.md`](docs
 - Serveur partagé : réseau Docker dédié `exam1-proxy` (les conteneurs exam1 ne peuvent plus joindre les services des autres sites hébergés) et limites mémoire / CPU par conteneur.
 - Accès de vérification au serveur à moindre privilège (compte sans sudo ni Docker, deux commandes de consultation, expiration automatique).
 - Microservice de notification : serveur SMTP configurable (`SMTP_HOST`, `SMTP_PORT`, Gmail par défaut). Les identifiants Gmail fournis étant refusés (erreur 535), les environnements utilisent un SMTP de test (Ethereal) qui capture les e-mails envoyés.
+- Politique de mot de passe renforcée à l'inscription (recommandations ANSSI) : 12 caractères minimum dont une majuscule, une minuscule, un chiffre et un caractère spécial, vérifiée par l'API (Joi) et par le formulaire.
 - Coût bcrypt porté de 10 à 12 ; le hash du mot de passe n'est plus jamais sérialisé en JSON.
 
 ### Corrigé

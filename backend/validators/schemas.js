@@ -11,12 +11,24 @@ const objectId = Joi.string().hex().length(24).messages({
   'string.length': '{{#label}} doit être un identifiant valide',
 });
 
+// Au moins une minuscule, une majuscule, un chiffre et un caractère spécial
+const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).*$/;
+const PASSWORD_MESSAGE =
+  'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial';
+
 const idParam = Joi.object({ id: objectId.required() });
 
 const register = Joi.object({
   username: Joi.string().trim().alphanum().min(3).max(30).required().label("Nom d'utilisateur"),
   email: Joi.string().trim().lowercase().email().max(254).required().label('Email'),
-  password: Joi.string().min(8).max(128).required().label('Mot de passe'),
+  // Politique alignée sur les recommandations de l'ANSSI : longueur et diversité des caractères
+  password: Joi.string()
+    .min(12)
+    .max(128)
+    .pattern(PASSWORD_RULE)
+    .required()
+    .label('Mot de passe')
+    .messages({ 'string.pattern.base': PASSWORD_MESSAGE }),
 });
 
 const login = Joi.object({

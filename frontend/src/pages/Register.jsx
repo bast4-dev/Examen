@@ -29,8 +29,11 @@ const Register = () => {
       setError("Le nom d'utilisateur doit contenir 3 à 30 lettres ou chiffres.");
       return;
     }
-    if (formData.password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères.');
+    // Même règle que l'API : 12 caractères dont majuscule, minuscule, chiffre et caractère spécial
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,128}$/.test(formData.password)) {
+      setError(
+        'Le mot de passe doit contenir au moins 12 caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial.'
+      );
       return;
     }
 
@@ -74,10 +77,10 @@ const Register = () => {
         <input
           type="password"
           name="password"
-          placeholder="Mot de passe (8 caractères min.)"
+          placeholder="Mot de passe (12 caractères min.)"
           autoComplete="new-password"
           required
-          minLength={8}
+          minLength={12}
           maxLength={128}
           value={formData.password}
           onChange={handleChange}
