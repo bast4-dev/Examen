@@ -5,13 +5,22 @@
 # Aucun port n'est publié sur l'hôte : seul le reverse proxy Caddy (HTTPS) joint le frontend et l'API
 # via le réseau Docker partagé, sous des alias propres à chaque environnement (STACK_NAME).
 
+# Rotation des journaux Docker : 3 fichiers de 10 Mo max par conteneur (le disque du serveur ne peut pas saturer)
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   mongo:
+    logging: *logging
     ports: !reset []
     # Limite la mémoire de MongoDB (serveur partagé)
     command: ["--wiredTigerCacheSizeGB", "0.25"]
 
   backend:
+    logging: *logging
     ports: !reset []
     environment:
       TRUST_PROXY: 1
@@ -21,11 +30,21 @@ services:
         aliases: ["${STACK_NAME:?STACK_NAME manquant}-backend"]
 
   frontend:
+    logging: *logging
     ports: !reset []
     networks:
       default: {}
       proxy:
         aliases: ["${STACK_NAME:?STACK_NAME manquant}-frontend"]
+
+  gateway:
+    logging: *logging
+
+  notifications:
+    logging: *logging
+
+  stock-management:
+    logging: *logging
 
 networks:
   proxy:
