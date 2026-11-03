@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer } from 'react';
+import { createContext, useContext, useEffect, useReducer } from 'react';
 
 const CartContext = createContext();
 
@@ -13,6 +13,27 @@ const initialCartState = {
     postalCode: '',
     country: '',
   },
+};
+
+// Le panier survit au rafraîchissement de la page (sessionStorage : propre à l'onglet, effacé à sa fermeture).
+// L'adresse de livraison, donnée personnelle, n'est volontairement pas conservée.
+const STORAGE_KEY = 'exam1-cart';
+
+const loadInitialState = () => {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
+    if (saved && Array.isArray(saved.cart)) {
+      return {
+        ...initialCartState,
+        cart: saved.cart,
+        shippingMethod: saved.shippingMethod || '',
+        paymentMethod: saved.paymentMethod || '',
+      };
+    }
+  } catch {
+    // stockage indisponible ou contenu invalide : on repart d'un panier vide
+  }
+  return initialCartState;
 };
 
 // Reducer pur : l'état existant n'est jamais modifié directement (React peut l'appeler deux fois)
@@ -75,7 +96,16 @@ export const cartReducer = (state, action) => {
 };
 
 export const CartProvider = ({ children }) => {
-  const [cartState, dispatch] = useReducer(cartReducer, initialCartState);
+  const [cartState, dispatch] = useReducer(cartReducer, undefined, loadInitialState);
+
+  useEffect(() => {
+    const { cart, shippingMethod, paymentMethod } = cartState;
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ cart, shippingMethod, paymentMethod }));
+    } catch {
+      // navigation privée ou stockage plein : le panier reste simplement en mémoire
+    }
+  }, [cartState]);
 
   return <CartContext.Provider value={{ ...cartState, dispatch }}>{children}</CartContext.Provider>;
 };

@@ -57,6 +57,8 @@ Les références (S1, B4…) renvoient au rapport d'audit [`docs/AUDIT.md`](docs
 - Traces de développement avec le module `debug` (`npm run dev:debug` → `DEBUG=app:*`), sans aucune donnée sensible.
 - Rotation des journaux Docker en préproduction / production (3 × 10 Mo par conteneur).
 - Déploiement continu : `development` → préproduction, `main` → production (SSH, clé dédiée, vérification post-déploiement).
+- Sauvegarde automatique quotidienne des bases MongoDB de préproduction et de production (`scripts/backup-mongo.sh`, cron, 7 jours de rétention, fichiers en accès restreint) et procédure de restauration testée.
+- Le panier et les choix de livraison/paiement sont conservés au rafraîchissement de la page (sessionStorage, propre à l'onglet) ; l'adresse de livraison n'est pas conservée.
 - Documentation du code générée par JSDoc (`npm --prefix backend run docs` → `docs/code/backend/`) et `README.md` racine.
 
 ### Modifié

@@ -84,4 +84,14 @@ Sur le serveur, chaque environnement est un projet Docker Compose distinct utili
 docker compose -p exam1-prod --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
+### Sauvegardes
+
+`scripts/backup-mongo.sh` sauvegarde chaque nuit les bases de préproduction et de production (`mongodump` compressé, 7 jours de rétention) :
+
+```bash
+crontab -e   # puis : 0 3 * * * $HOME/exam1/scripts/backup-mongo.sh >> $HOME/backups/exam1/backup.log 2>&1
+# Restauration :
+docker exec -i exam1-prod-mongo-1 mongorestore --archive --gzip --drop < exam1-prod-AAAA-MM-JJ_HHMM.archive.gz
+```
+
 Secrets requis côté GitHub (Settings → Secrets → Actions) : `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (clé privée encodée en base64).
