@@ -31,3 +31,5 @@ data/db/
 
 # Dossier de rendu (contient des captures sensibles)
 docs/*.docx
+docs/*.pdf
+CONSIGNE EXAMEN.pdf

@@ -95,12 +95,20 @@
 </table>
 <h2>Démarrage rapide (Docker)</h2>
 <p>Prérequis : Docker et Docker Compose.</p>
-<pre class="prettyprint source lang-bash"><code>cp .env.example .env          # puis renseigner les secrets (openssl rand -hex 32)
+<pre class="prettyprint source lang-bash"><code>cp .env.example .env
+# Génère des secrets aléatoires (le backend refuse de démarrer avec un JWT_SECRET de moins de 32 caractères)
+sed -i.bak -e &quot;s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/&quot; -e &quot;s/^INTERNAL_API_KEY=.*/INTERNAL_API_KEY=$(openssl rand -hex 32)/&quot; .env
 docker compose up -d --build
 docker compose exec backend node seeder.js --force
 docker compose exec -e ADMIN_USERNAME=admin -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD='MotDePasseLong!' backend node scripts/createAdmin.js
 </code></pre>
 <p>Application : http://localhost:3000 — santé de l'API : http://localhost:5000/api/health</p>
+<h3>E-mails (SMTP)</h3>
+<p>⚠️ <strong>Le compte SMTP Gmail fourni avec le sujet n'est plus valide</strong> : Gmail refuse ses identifiants (<code>535-5.7.8 Username and Password not accepted</code>), son mot de passe d'application ayant vraisemblablement été révoqué. Le microservice de notification accepte donc n'importe quel serveur SMTP via <code>SMTP_HOST</code> / <code>SMTP_PORT</code> (Gmail si vide). La préproduction et la production utilisent un SMTP de test, <a href="https://ethereal.email">Ethereal</a>, qui reçoit réellement les e-mails envoyés et les affiche dans une boîte web, sans les distribuer.</p>
+<p>Pour créer un compte Ethereal de test :</p>
+<pre class="prettyprint source lang-bash"><code>cd microservices/notifications && node -e &quot;require('nodemailer').createTestAccount().then(a => console.log(a.user, a.pass))&quot;
+</code></pre>
+<p>Puis dans <code>.env</code> : <code>SMTP_HOST=smtp.ethereal.email</code>, <code>SMTP_PORT=587</code>, <code>EMAIL_USER=&lt;user&gt;</code>, <code>EMAIL_APPLICATION_PASSWORD=&lt;pass&gt;</code>. Sans SMTP valide, l'application fonctionne normalement : les envois échouent et sont simplement journalisés.</p>
 <h2>Démarrage sans Docker</h2>
 <p>Prérequis : Node.js 22+, MongoDB local.</p>
 <pre class="prettyprint source lang-bash"><code>npm run install:all
@@ -114,8 +122,51 @@ npm run start:all
 <li><a href="CHANGELOG.md">Journal des évolutions</a></li>
 <li>Documentation du code backend générée par JSDoc : <code>npm --prefix backend run docs</code> → <code>docs/code/backend/index.html</code></li>
 </ul>
-<h2>Intégration continue</h2>
-<p><code>.github/workflows/ci.yml</code> : audit de sécurité npm, build et vérification de chaque service, puis build et test de la stack Docker à chaque push.</p></article>
+<h2>Qualité du code</h2>
+<pre class="prettyprint source lang-bash"><code>npm install          # à la racine : ESLint + Prettier
+npm run lint         # ESLint
+npm run format       # Prettier
+npm --prefix backend run dev:debug   # traces de développement (DEBUG=app:*)
+</code></pre>
+<h2>CI/CD et déploiement</h2>
+<p><code>.github/workflows/ci.yml</code>, à chaque push :</p>
+<ol>
+<li>qualité du code (ESLint, Prettier) ;</li>
+<li>audit de sécurité npm, build et vérification de chaque service ;</li>
+<li>build et test de la stack Docker ;</li>
+<li>déploiement par SSH : <code>development</code> → préproduction, <code>main</code> → production.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Environnement</th>
+<th>Frontend</th>
+<th>API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Production</td>
+<td>https://exam1-prod.duckdns.org</td>
+<td>https://api.exam1-prod.duckdns.org/api</td>
+</tr>
+<tr>
+<td>Préproduction</td>
+<td>https://exam1-preprod.duckdns.org</td>
+<td>https://api.exam1-preprod.duckdns.org/api</td>
+</tr>
+</tbody>
+</table>
+<p>Sur le serveur, chaque environnement est un projet Docker Compose distinct utilisant <code>docker-compose.prod.yml</code> (aucun port publié, réseau dédié <code>exam1-proxy</code> partagé uniquement avec le reverse proxy Caddy qui gère le HTTPS, limites mémoire/CPU, rotation des journaux) :</p>
+<pre class="prettyprint source lang-bash"><code>docker compose -p exam1-prod --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+</code></pre>
+<h3>Sauvegardes</h3>
+<p><code>scripts/backup-mongo.sh</code> sauvegarde chaque nuit les bases de préproduction et de production (<code>mongodump</code> compressé, 7 jours de rétention) :</p>
+<pre class="prettyprint source lang-bash"><code>crontab -e   # puis : 0 3 * * * $HOME/exam1/scripts/backup-mongo.sh >> $HOME/backups/exam1/backup.log 2>&1
+# Restauration :
+docker exec -i exam1-prod-mongo-1 mongorestore --archive --gzip --drop &lt; exam1-prod-AAAA-MM-JJ_HHMM.archive.gz
+</code></pre>
+<p>Secrets requis côté GitHub (Settings → Secrets → Actions) : <code>VPS_HOST</code>, <code>VPS_USER</code>, <code>VPS_SSH_KEY</code> (clé privée encodée en base64).</p></article>
     </section>
 
 
@@ -132,7 +183,7 @@ npm run start:all
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Nov 03 2026 12:17:12 GMT+0100 (Central European Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Nov 03 2026 16:08:53 GMT+0100 (Central European Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>
