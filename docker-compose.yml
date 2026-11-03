@@ -1,32 +1,87 @@
-version: '3'
+# Orchestration complète de l'application (préproduction / production)
+# Les secrets sont lus dans le fichier .env à la racine (non versionné) — voir .env.example
+# Lancement : docker compose up -d --build
+
 services:
-  frontend:
-    build: ./frontend
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    # Accessible uniquement depuis la machine hôte (Compass), jamais depuis l'extérieur
     ports:
-      - '3000:3000'
-    depends_on:
-      - backend
+      - "127.0.0.1:${MONGO_PORT:-27018}:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build: ./backend
-    ports:
-      - '5000:5000'
+    restart: unless-stopped
     environment:
-      - MONGO_URI=mongodb://mongo:27017/mydatabase
-    depends_on:
-      - mongo
-
-  mongo:
-    image: mongo
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/exam1Db
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquant dans .env}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      GATEWAY_URL: http://gateway:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+    volumes:
+      - backend-logs:/app/logs
     ports:
-      - '27018:27017'
+      - "${API_PORT:-5000}:5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      gateway:
+        condition: service_started
+
+  # Gateway et microservices : aucun port publié, joignables uniquement sur le réseau Docker interne
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    environment:
+      GATEWAY_PORT: 8000
+      NOTIFI_SERVICE_URL: http://notifications:4002
+      STOCK_SERVICE_URL: http://stock-management:4003
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
+    depends_on:
+      - notifications
+      - stock-management
 
   notifications:
     build: ./microservices/notifications
-    ports:
-      - '3001:3001'
+    restart: unless-stopped
+    environment:
+      NOTIFI_PORT: 4002
+      EMAIL_USER: ${EMAIL_USER:?EMAIL_USER manquant dans .env}
+      EMAIL_APPLICATION_PASSWORD: ${EMAIL_APPLICATION_PASSWORD:?EMAIL_APPLICATION_PASSWORD manquant dans .env}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
 
   stock-management:
     build: ./microservices/stock-management
+    restart: unless-stopped
+    environment:
+      STOCK_PORT: 4003
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
+      LOW_STOCK_THRESHOLD: ${LOW_STOCK_THRESHOLD:-5}
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
+    restart: unless-stopped
     ports:
-      - '3002:3002'
+      - "${FRONT_PORT:-3000}:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:
+  backend-logs:
