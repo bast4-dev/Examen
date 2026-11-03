@@ -60,9 +60,20 @@ exports.logout = (req, res) => {
  * @returns {{username: string, email: string, role: string}}
  */
 exports.me = async (req, res) => {
-  const user = await User.findById(req.user.userId).select('username email role');
-  if (!user) throw new HttpError(401, 'Session invalide');
-  res.json({ username: user.username, email: user.email, role: user.role });
+  // « Personne n'est connecté » est une réponse normale, pas une erreur (évite un 401 à chaque visite)
+  const token = req.cookies?.token;
+  if (!token) return res.json({ user: null });
+
+  let payload;
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+  } catch {
+    return res.json({ user: null });
+  }
+
+  const user = await User.findById(payload.userId).select('username email role');
+  if (!user) return res.json({ user: null });
+  res.json({ user: { username: user.username, email: user.email, role: user.role } });
 };
 
 /**

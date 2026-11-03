@@ -61,6 +61,7 @@ Niveaux de gravité : 🔴 Critique · 🟠 Haute · 🟡 Moyenne · ⚪ Faible
 | B17 | ⚪ | URL de l'API codée en dur (`http://localhost:5000`) → impossible à déployer. Faute de frappe dans la route `/shippig_payment`. Fichier `components/ProductList.js` en double (copie de `ProtectedRoute`). | `services/*.js`, `App.js` | Variable d'environnement `VITE_API_URL` ; route `/shipping-payment` ; fichier supprimé. |
 | B21 | 🟡 | **Panier conservé après la déconnexion** : le panier, l'adresse de livraison et les choix de livraison/paiement restent affichés pour la personne suivante (fuite de données personnelles sur un poste partagé). | `components/Navbar.jsx`, `context/CartContext.jsx` | Réinitialisation complète du panier et des données de livraison à la déconnexion (action `RESET`). |
 | B22 | 🟡 | **Panier perdu au rafraîchissement de la page** : le panier n'existe qu'en mémoire ; un simple F5 vide le panier et les choix de livraison et de paiement. | `context/CartContext.jsx` | Panier et choix conservés dans le `sessionStorage` (propre à l'onglet, effacé à sa fermeture) ; l'adresse de livraison, donnée personnelle, n'est pas conservée. |
+| B23 | ⚪ | **Erreur affichée dans la console à chaque visite** : la vérification de session (`GET /api/auth/me`) répond 401 quand personne n'est connecté, ce que le navigateur affiche en rouge. | `controllers/authController.js`, `routes/authRoutes.js` | Réponse normale `200 { user: null }` pour un visiteur ; les routes protégées continuent de renvoyer 401 / 403. |
 
 ### Infrastructure / projet
 

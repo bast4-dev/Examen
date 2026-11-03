@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     fetchCurrentUser()
-      .then((response) => setUser(response.data))
+      .then((response) => setUser(response.data.user))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
