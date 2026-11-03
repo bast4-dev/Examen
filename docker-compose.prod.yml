@@ -3,7 +3,8 @@
 #   docker compose -p exam1-preprod --env-file .env.preprod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
 # Aucun port n'est publié sur l'hôte : seul le reverse proxy Caddy (HTTPS) joint le frontend et l'API
-# via le réseau Docker partagé, sous des alias propres à chaque environnement (STACK_NAME).
+# via un réseau Docker DÉDIÉ (exam1-proxy) : les conteneurs exam1 ne voient aucun autre service du serveur.
+# Limites mémoire/CPU : une surcharge d'exam1 ne peut pas pénaliser les autres sites hébergés.
 
 # Rotation des journaux Docker : 3 fichiers de 10 Mo max par conteneur (le disque du serveur ne peut pas saturer)
 x-logging: &logging
@@ -15,12 +16,16 @@ x-logging: &logging
 services:
   mongo:
     logging: *logging
+    mem_limit: 512m
+    cpus: 0.5
     ports: !reset []
     # Limite la mémoire de MongoDB (serveur partagé)
     command: ['--wiredTigerCacheSizeGB', '0.25']
 
   backend:
     logging: *logging
+    mem_limit: 256m
+    cpus: 0.5
     ports: !reset []
     environment:
       TRUST_PROXY: 1
@@ -31,6 +36,8 @@ services:
 
   frontend:
     logging: *logging
+    mem_limit: 64m
+    cpus: 0.25
     ports: !reset []
     networks:
       default: {}
@@ -39,14 +46,20 @@ services:
 
   gateway:
     logging: *logging
+    mem_limit: 128m
+    cpus: 0.25
 
   notifications:
     logging: *logging
+    mem_limit: 128m
+    cpus: 0.25
 
   stock-management:
     logging: *logging
+    mem_limit: 96m
+    cpus: 0.25
 
 networks:
   proxy:
     external: true
-    name: ${PROXY_NETWORK:-resid_resid}
+    name: ${PROXY_NETWORK:-exam1-proxy}
