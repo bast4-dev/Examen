@@ -15,6 +15,12 @@ const cookieOptions = () => ({
   ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
 });
 
+/**
+ * Connecte un utilisateur et pose le JWT dans un cookie HttpOnly.
+ * @route POST /api/auth/login
+ * @param {express.Request} req - body : { username, password } (validé par Joi)
+ * @param {express.Response} res - 200 { username, role } | 401 Identifiants invalides
+ */
 exports.login = async (req, res) => {
   const { username, password } = req.body;
 
@@ -35,18 +41,32 @@ exports.login = async (req, res) => {
   res.json({ username: user.username, role: user.role });
 };
 
+/**
+ * Déconnecte l'utilisateur en supprimant le cookie de session.
+ * @route POST /api/auth/logout
+ */
 exports.logout = (req, res) => {
   res.clearCookie('token', cookieOptions());
   res.json({ message: 'Déconnecté' });
 };
 
-// Permet au frontend de connaître la session en cours (le cookie n'est pas lisible en JavaScript)
+/**
+ * Renvoie l'utilisateur de la session en cours (le cookie n'est pas lisible en JavaScript).
+ * @route GET /api/auth/me
+ * @returns {{username: string, email: string, role: string}}
+ */
 exports.me = async (req, res) => {
   const user = await User.findById(req.user.userId).select('username email role');
   if (!user) throw new HttpError(401, 'Session invalide');
   res.json({ username: user.username, email: user.email, role: user.role });
 };
 
+/**
+ * Inscrit un nouvel utilisateur (rôle toujours « user ») et envoie un e-mail de bienvenue.
+ * @route POST /api/auth/register
+ * @param {express.Request} req - body : { username, email, password }
+ * @param {express.Response} res - 201 | 409 si le nom ou l'email existe déjà
+ */
 exports.register = async (req, res) => {
   const { username, email, password } = req.body;
 

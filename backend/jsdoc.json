@@ -1,0 +1,12 @@
+{
+  "source": {
+    "include": ["controllers", "middlewares", "services", "utils", "validators", "config"],
+    "includePattern": "\\.js$"
+  },
+  "opts": {
+    "destination": "../docs/code/backend",
+    "recurse": true,
+    "readme": "../README.md"
+  },
+  "plugins": ["plugins/markdown"]
+}

@@ -21,6 +21,12 @@ const messages = {
   'object.base': '{{#label}} doit être un objet',
 };
 
+/**
+ * Fabrique un middleware de validation Joi.
+ * @param {Joi.Schema} schema - schéma Joi à appliquer
+ * @param {'body'|'params'|'query'} [property='body'] - partie de la requête à valider
+ * @returns {express.RequestHandler} répond 400 avec le détail des erreurs, sinon remplace req[property] par la valeur nettoyée
+ */
 module.exports = (schema, property = 'body') => (req, res, next) => {
   const { error, value } = schema.validate(req[property], {
     abortEarly: false,

@@ -1,0 +1,33 @@
+# Surcharge pour le serveur (préproduction et production) — utilisée avec docker-compose.yml :
+#   docker compose -p exam1-prod    --env-file .env.prod    -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#   docker compose -p exam1-preprod --env-file .env.preprod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Aucun port n'est publié sur l'hôte : seul le reverse proxy Caddy (HTTPS) joint le frontend et l'API
+# via le réseau Docker partagé, sous des alias propres à chaque environnement (STACK_NAME).
+
+services:
+  mongo:
+    ports: !reset []
+    # Limite la mémoire de MongoDB (serveur partagé)
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+
+  backend:
+    ports: !reset []
+    environment:
+      TRUST_PROXY: 1
+    networks:
+      default: {}
+      proxy:
+        aliases: ["${STACK_NAME:?STACK_NAME manquant}-backend"]
+
+  frontend:
+    ports: !reset []
+    networks:
+      default: {}
+      proxy:
+        aliases: ["${STACK_NAME:?STACK_NAME manquant}-frontend"]
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-resid_resid}

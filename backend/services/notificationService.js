@@ -10,6 +10,11 @@ const gateway = axios.create({
   headers: { 'x-api-key': process.env.INTERNAL_API_KEY },
 });
 
+/**
+ * Envoie un e-mail via le gateway → microservice de notification. Ne lève jamais d'erreur.
+ * @param {{to: string, subject: string, text: string}} mail
+ * @returns {Promise<void>}
+ */
 exports.sendEmail = async ({ to, subject, text }) => {
   if (!to) return;
   try {
@@ -20,6 +25,12 @@ exports.sendEmail = async ({ to, subject, text }) => {
   }
 };
 
+/**
+ * Signale un nouveau niveau de stock au microservice de stock (alerte stock bas).
+ * @param {string} productId
+ * @param {number} stock
+ * @returns {Promise<void>}
+ */
 exports.notifyStockUpdate = async (productId, stock) => {
   try {
     await gateway.post('/update-stock', { productId: String(productId), stock });

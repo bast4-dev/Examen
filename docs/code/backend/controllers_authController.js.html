@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: controllers/authController.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: controllers/authController.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>// backend/controllers/authController.js
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const logger = require('../utils/logger');
+const HttpError = require('../utils/httpError');
+const { sendEmail } = require('../services/notificationService');
+
+const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 heure
+
+const cookieOptions = () => ({
+  httpOnly: true, // inaccessible depuis JavaScript (protection XSS)
+  secure: process.env.NODE_ENV === 'production', // HTTPS uniquement en production
+  sameSite: 'strict', // non envoyé par des sites tiers (protection CSRF)
+  path: '/',
+  ...(process.env.COOKIE_DOMAIN &amp;&amp; { domain: process.env.COOKIE_DOMAIN }),
+});
+
+/**
+ * Connecte un utilisateur et pose le JWT dans un cookie HttpOnly.
+ * @route POST /api/auth/login
+ * @param {express.Request} req - body : { username, password } (validé par Joi)
+ * @param {express.Response} res - 200 { username, role } | 401 Identifiants invalides
+ */
+exports.login = async (req, res) => {
+  const { username, password } = req.body;
+
+  const user = await User.findOne({ username });
+  // Même réponse que l'utilisateur existe ou non (pas d'énumération des comptes)
+  if (!user || !(await user.comparePassword(password))) {
+    logger.warn('Échec de connexion', { username, ip: req.ip });
+    throw new HttpError(401, 'Identifiants invalides');
+  }
+
+  const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: TOKEN_TTL_MS / 1000,
+    algorithm: 'HS256',
+  });
+
+  res.cookie('token', token, { ...cookieOptions(), maxAge: TOKEN_TTL_MS });
+  logger.info('Connexion réussie', { userId: user._id, role: user.role });
+  res.json({ username: user.username, role: user.role });
+};
+
+/**
+ * Déconnecte l'utilisateur en supprimant le cookie de session.
+ * @route POST /api/auth/logout
+ */
+exports.logout = (req, res) => {
+  res.clearCookie('token', cookieOptions());
+  res.json({ message: 'Déconnecté' });
+};
+
+/**
+ * Renvoie l'utilisateur de la session en cours (le cookie n'est pas lisible en JavaScript).
+ * @route GET /api/auth/me
+ * @returns {{username: string, email: string, role: string}}
+ */
+exports.me = async (req, res) => {
+  const user = await User.findById(req.user.userId).select('username email role');
+  if (!user) throw new HttpError(401, 'Session invalide');
+  res.json({ username: user.username, email: user.email, role: user.role });
+};
+
+/**
+ * Inscrit un nouvel utilisateur (rôle toujours « user ») et envoie un e-mail de bienvenue.
+ * @route POST /api/auth/register
+ * @param {express.Request} req - body : { username, email, password }
+ * @param {express.Response} res - 201 | 409 si le nom ou l'email existe déjà
+ */
+exports.register = async (req, res) => {
+  const { username, email, password } = req.body;
+
+  const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+  if (existingUser) {
+    throw new HttpError(409, "Ce nom d'utilisateur ou cet email est déjà utilisé.");
+  }
+
+  // Le rôle n'est jamais repris de la requête : tout nouveau compte est un simple utilisateur
+  const user = await User.create({ username, email, password });
+  logger.info('Nouvel utilisateur inscrit', { userId: user._id });
+
+  sendEmail({
+    to: email,
+    subject: 'Bienvenue dans notre application',
+    text: `Bonjour ${username},\n\nMerci de vous être inscrit. Nous sommes ravis de vous accueillir !`,
+  });
+
+  res.status(201).json({ message: 'Utilisateur créé avec succès.' });
+};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#createOrder">createOrder</a></li><li><a href="global.html#getMyOrders">getMyOrders</a></li><li><a href="global.html#getOrders">getOrders</a></li><li><a href="global.html#getProducts">getProducts</a></li><li><a href="global.html#isAdmin">isAdmin</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#me">me</a></li><li><a href="global.html#notifyCustomer">notifyCustomer</a></li><li><a href="global.html#notifyStockUpdate">notifyStockUpdate</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#releaseStock">releaseStock</a></li><li><a href="global.html#reserveStock">reserveStock</a></li><li><a href="global.html#sendEmail">sendEmail</a></li><li><a href="global.html#updateOrderStatus">updateOrderStatus</a></li><li><a href="global.html#updateProductStock">updateProductStock</a></li><li><a href="global.html#validateOrder">validateOrder</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Nov 03 2026 11:09:15 GMT+0100 (Central European Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

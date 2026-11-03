@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: controllers/orderController.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: controllers/orderController.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>// backend/controllers/orderController.js
+const mongoose = require('mongoose');
+const Order = require('../models/Order');
+const Product = require('../models/Product');
+const User = require('../models/User');
+const logger = require('../utils/logger');
+const HttpError = require('../utils/httpError');
+const { sendEmail, notifyStockUpdate } = require('../services/notificationService');
+
+/**
+ * Réserve le stock de façon atomique : la mise à jour n'a lieu que si le stock est suffisant,
+ * ce qui empêche la survente même avec des commandes simultanées.
+ * @param {string} productId - identifiant du produit
+ * @param {number} quantity - quantité à réserver
+ * @returns {Promise&lt;object>} le produit mis à jour
+ * @throws {HttpError} 409 si stock insuffisant, 404 si produit inexistant
+ */
+const reserveStock = async (productId, quantity) => {
+  const product = await Product.findOneAndUpdate(
+    { _id: productId, stock: mongoose.trusted({ $gte: quantity }) },
+    { $inc: { stock: -quantity } },
+    { new: true }
+  );
+  if (product) return product;
+
+  const exists = await Product.exists({ _id: productId });
+  throw exists
+    ? new HttpError(409, 'Stock insuffisant pour un des produits de la commande')
+    : new HttpError(404, "Un des produits de la commande n'existe plus");
+};
+
+/**
+ * Remet en stock des quantités précédemment réservées.
+ * @param {Array&lt;{productId: string, quantity: number}>} reserved
+ * @returns {Promise&lt;Array>}
+ */
+const releaseStock = (reserved) =>
+  Promise.all(reserved.map(({ productId, quantity }) => Product.updateOne({ _id: productId }, { $inc: { stock: quantity } })));
+
+/**
+ * Crée une commande : prix relus en base (jamais ceux du client), stock réservé,
+ * puis notifications non bloquantes (client, admin, microservice de stock).
+ * @route POST /api/orders
+ * @param {express.Request} req - body : { items[{productId, quantity}], shippingAddress, paymentMethod, shippingMethod }
+ * @param {express.Response} res - 201 { message, order } | 409 stock insuffisant | 404 produit inexistant
+ */
+exports.createOrder = async (req, res) => {
+  const { items, shippingAddress, paymentMethod, shippingMethod } = req.body;
+
+  // Regroupe les lignes portant sur le même produit
+  const quantities = new Map();
+  for (const { productId, quantity } of items) {
+    quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+  }
+
+  const reserved = [];
+  const reservedProducts = [];
+  let order;
+  try {
+    for (const [productId, quantity] of quantities) {
+      const product = await reserveStock(productId, quantity);
+      reserved.push({ productId, quantity });
+      reservedProducts.push(product);
+    }
+
+    // Le prix vient TOUJOURS de la base, jamais du client
+    const orderItems = reservedProducts.map((product, i) => ({
+      productId: product._id,
+      quantity: reserved[i].quantity,
+      price: product.price,
+    }));
+    const total = Math.round(orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0) * 100) / 100;
+
+    order = await Order.create({
+      userId: req.user.userId,
+      items: orderItems,
+      total,
+      shippingAddress,
+      paymentMethod,
+      shippingMethod,
+    });
+  } catch (error) {
+    // Échec : on rend le stock déjà réservé
+    if (reserved.length > 0) await releaseStock(reserved);
+    throw error;
+  }
+
+  logger.info('Commande créée', { orderId: order._id, userId: req.user.userId, total: order.total });
+  res.status(201).json({ message: 'Commande créée avec succès', order });
+
+  // Notifications après la réponse : elles ne retardent ni ne font échouer la commande
+  try {
+    const user = await User.findById(req.user.userId).select('email username');
+    const lines = reservedProducts.map((p, i) => `- ${p.name} x${reserved[i].quantity} : ${p.price} €`).join('\n');
+    sendEmail({
+      to: user?.email,
+      subject: 'Confirmation de votre commande',
+      text: `Bonjour ${user?.username},\n\nVotre commande n°${order._id} a bien été enregistrée :\n${lines}\n\nTotal : ${order.total} €`,
+    });
+    sendEmail({
+      to: process.env.ADMIN_EMAIL,
+      subject: 'Nouvelle commande créée',
+      text: `Nouvelle commande n°${order._id} de ${user?.username} :\n${lines}\n\nTotal : ${order.total} €`,
+    });
+    reservedProducts.forEach((p) => notifyStockUpdate(p._id, p.stock));
+  } catch (error) {
+    logger.error("Échec de l'envoi des notifications de commande", { orderId: order._id, error: error.message });
+  }
+};
+
+/**
+ * Liste les commandes de l'utilisateur connecté.
+ * @route GET /api/orders/mine
+ */
+exports.getMyOrders = async (req, res) => {
+  const orders = await Order.find({ userId: req.user.userId }).sort({ createdAt: -1 });
+  res.json(orders);
+};
+
+exports.releaseStock = releaseStock;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#createOrder">createOrder</a></li><li><a href="global.html#getMyOrders">getMyOrders</a></li><li><a href="global.html#getOrders">getOrders</a></li><li><a href="global.html#getProducts">getProducts</a></li><li><a href="global.html#isAdmin">isAdmin</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#me">me</a></li><li><a href="global.html#notifyCustomer">notifyCustomer</a></li><li><a href="global.html#notifyStockUpdate">notifyStockUpdate</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#releaseStock">releaseStock</a></li><li><a href="global.html#reserveStock">reserveStock</a></li><li><a href="global.html#sendEmail">sendEmail</a></li><li><a href="global.html#updateOrderStatus">updateOrderStatus</a></li><li><a href="global.html#updateProductStock">updateProductStock</a></li><li><a href="global.html#validateOrder">validateOrder</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Nov 03 2026 11:09:15 GMT+0100 (Central European Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

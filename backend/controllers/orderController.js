@@ -7,8 +7,14 @@ const logger = require('../utils/logger');
 const HttpError = require('../utils/httpError');
 const { sendEmail, notifyStockUpdate } = require('../services/notificationService');
 
-// Réserve le stock de façon atomique : la mise à jour n'a lieu que si le stock est suffisant,
-// ce qui empêche la survente même avec des commandes simultanées.
+/**
+ * Réserve le stock de façon atomique : la mise à jour n'a lieu que si le stock est suffisant,
+ * ce qui empêche la survente même avec des commandes simultanées.
+ * @param {string} productId - identifiant du produit
+ * @param {number} quantity - quantité à réserver
+ * @returns {Promise<object>} le produit mis à jour
+ * @throws {HttpError} 409 si stock insuffisant, 404 si produit inexistant
+ */
 const reserveStock = async (productId, quantity) => {
   const product = await Product.findOneAndUpdate(
     { _id: productId, stock: mongoose.trusted({ $gte: quantity }) },
@@ -23,9 +29,21 @@ const reserveStock = async (productId, quantity) => {
     : new HttpError(404, "Un des produits de la commande n'existe plus");
 };
 
+/**
+ * Remet en stock des quantités précédemment réservées.
+ * @param {Array<{productId: string, quantity: number}>} reserved
+ * @returns {Promise<Array>}
+ */
 const releaseStock = (reserved) =>
   Promise.all(reserved.map(({ productId, quantity }) => Product.updateOne({ _id: productId }, { $inc: { stock: quantity } })));
 
+/**
+ * Crée une commande : prix relus en base (jamais ceux du client), stock réservé,
+ * puis notifications non bloquantes (client, admin, microservice de stock).
+ * @route POST /api/orders
+ * @param {express.Request} req - body : { items[{productId, quantity}], shippingAddress, paymentMethod, shippingMethod }
+ * @param {express.Response} res - 201 { message, order } | 409 stock insuffisant | 404 produit inexistant
+ */
 exports.createOrder = async (req, res) => {
   const { items, shippingAddress, paymentMethod, shippingMethod } = req.body;
 
@@ -90,6 +108,10 @@ exports.createOrder = async (req, res) => {
   }
 };
 
+/**
+ * Liste les commandes de l'utilisateur connecté.
+ * @route GET /api/orders/mine
+ */
 exports.getMyOrders = async (req, res) => {
   const orders = await Order.find({ userId: req.user.userId }).sort({ createdAt: -1 });
   res.json(orders);

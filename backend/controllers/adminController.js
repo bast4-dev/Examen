@@ -7,7 +7,11 @@ const HttpError = require('../utils/httpError');
 const { sendEmail, notifyStockUpdate } = require('../services/notificationService');
 const { releaseStock } = require('./orderController');
 
-// Appelée après l'envoi de la réponse : ne doit jamais lever d'erreur
+/**
+ * Informe le client du nouveau statut de sa commande. Appelée après l'envoi de la réponse :
+ * ne lève jamais d'erreur.
+ * @param {object} order - commande Mongoose
+ */
 const notifyCustomer = async (order) => {
   try {
     const user = await User.findById(order.userId).select('email username');
@@ -21,13 +25,20 @@ const notifyCustomer = async (order) => {
   }
 };
 
-// Récupérer toutes les commandes
+/**
+ * Liste toutes les commandes (admin).
+ * @route GET /api/admin/orders
+ */
 exports.getOrders = async (req, res) => {
   const orders = await Order.find().sort({ createdAt: -1 });
   res.json(orders);
 };
 
-// Changer l'état d'une commande
+/**
+ * Change le statut d'une commande (admin). Une annulation remet les produits en stock.
+ * @route PUT /api/admin/orders/:id/status
+ * @param {express.Request} req - params.id, body : { status }
+ */
 exports.updateOrderStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -49,7 +60,10 @@ exports.updateOrderStatus = async (req, res) => {
   notifyCustomer(order);
 };
 
-// Valider une commande : « En attente » -> « En cours de traitement »
+/**
+ * Valide une commande : « En attente » → « En cours de traitement » (admin).
+ * @route PUT /api/admin/orders/:id/validate
+ */
 exports.validateOrder = async (req, res) => {
   const { id } = req.params;
 
@@ -68,13 +82,20 @@ exports.validateOrder = async (req, res) => {
   notifyCustomer(order);
 };
 
-// Récupérer tous les produits
+/**
+ * Liste tous les produits avec leur stock (admin).
+ * @route GET /api/admin/products
+ */
 exports.getProducts = async (req, res) => {
   const products = await Product.find().sort({ name: 1 });
   res.json(products);
 };
 
-// Mettre à jour le stock d'un produit
+/**
+ * Met à jour le stock d'un produit (admin) et prévient le microservice de stock.
+ * @route PUT /api/admin/products/:id/stock
+ * @param {express.Request} req - params.id, body : { stock } (entier ≥ 0)
+ */
 exports.updateProductStock = async (req, res) => {
   const { id } = req.params;
   const { stock } = req.body;
