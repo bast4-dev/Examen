@@ -19,6 +19,8 @@ Les références (S1, B4…) renvoient au rapport d'audit [`docs/AUDIT.md`](docs
 - Routes d'administration regroupées sous `/api/admin` et protégées par `authenticateToken` + `isAdmin` ; rôle utilisateur limité à `user` / `admin` (S12, S13).
 - Destinataires des e-mails issus de la base / de la configuration (`ADMIN_EMAIL`) au lieu d'une adresse codée en dur (S14).
 - Vérification des variables d'environnement au démarrage, taille des requêtes limitée (S15).
+- Serveur partagé : réseau Docker dédié `exam1-proxy` (les conteneurs exam1 ne peuvent plus joindre les services des autres sites hébergés) et limites mémoire / CPU par conteneur.
+- Accès de vérification au serveur à moindre privilège (compte sans sudo ni Docker, deux commandes de consultation, expiration automatique).
 - Coût bcrypt porté de 10 à 12 ; le hash du mot de passe n'est plus jamais sérialisé en JSON.
 
 ### Corrigé

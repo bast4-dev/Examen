@@ -16,13 +16,17 @@ Catalogue, panier, commande (adresse, transporteur, paiement), rôles `user` / `
 Prérequis : Docker et Docker Compose.
 
 ```bash
-cp .env.example .env          # puis renseigner les secrets (openssl rand -hex 32)
+cp .env.example .env
+# Génère des secrets aléatoires (le backend refuse de démarrer avec un JWT_SECRET de moins de 32 caractères)
+sed -i.bak -e "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" -e "s/^INTERNAL_API_KEY=.*/INTERNAL_API_KEY=$(openssl rand -hex 32)/" .env
 docker compose up -d --build
 docker compose exec backend node seeder.js --force
 docker compose exec -e ADMIN_USERNAME=admin -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD='MotDePasseLong!' backend node scripts/createAdmin.js
 ```
 
 Application : http://localhost:3000 — santé de l'API : http://localhost:5000/api/health
+
+Sans identifiants SMTP valides (`EMAIL_USER`, `EMAIL_APPLICATION_PASSWORD`), l'application fonctionne normalement : les e-mails échouent et sont simplement journalisés.
 
 ## Démarrage sans Docker
 
@@ -41,6 +45,33 @@ npm run start:all
 - [Journal des évolutions](CHANGELOG.md)
 - Documentation du code backend générée par JSDoc : `npm --prefix backend run docs` → `docs/code/backend/index.html`
 
-## Intégration continue
+## Qualité du code
 
-`.github/workflows/ci.yml` : audit de sécurité npm, build et vérification de chaque service, puis build et test de la stack Docker à chaque push.
+```bash
+npm install          # à la racine : ESLint + Prettier
+npm run lint         # ESLint
+npm run format       # Prettier
+npm --prefix backend run dev:debug   # traces de développement (DEBUG=app:*)
+```
+
+## CI/CD et déploiement
+
+`.github/workflows/ci.yml`, à chaque push :
+
+1. qualité du code (ESLint, Prettier) ;
+2. audit de sécurité npm, build et vérification de chaque service ;
+3. build et test de la stack Docker ;
+4. déploiement par SSH : `development` → préproduction, `main` → production.
+
+| Environnement | Frontend | API |
+|---|---|---|
+| Production | https://exam1-prod.duckdns.org | https://api.exam1-prod.duckdns.org/api |
+| Préproduction | https://exam1-preprod.duckdns.org | https://api.exam1-preprod.duckdns.org/api |
+
+Sur le serveur, chaque environnement est un projet Docker Compose distinct utilisant `docker-compose.prod.yml` (aucun port publié, réseau dédié `exam1-proxy` partagé uniquement avec le reverse proxy Caddy qui gère le HTTPS, limites mémoire/CPU, rotation des journaux) :
+
+```bash
+docker compose -p exam1-prod --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Secrets requis côté GitHub (Settings → Secrets → Actions) : `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (clé privée encodée en base64).
