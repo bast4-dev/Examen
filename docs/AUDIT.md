@@ -25,6 +25,7 @@ Niveaux de gravité : 🔴 Critique · 🟠 Haute · 🟡 Moyenne · ⚪ Faible
 | S13 | 🟡 | **Rôle non contraint** dans le modèle `User` (n'importe quelle chaîne acceptée). | `models/User.js` | `enum: ['user', 'admin']`. |
 | S14 | ⚪ | **Adresse e-mail personnelle codée en dur** comme destinataire des notifications. | `orderController.js:62` | Destinataires issus de la base (client) et de la configuration (`ADMIN_EMAIL`). |
 | S15 | ⚪ | **Corps de requête sans limite de taille explicite** ; pas de vérification des variables d'environnement au démarrage. | `backend/server.js` | `express.json({ limit: '10kb' })` ; arrêt au démarrage si une variable obligatoire manque. |
+| S16 | 🟡 | **Politique de mot de passe faible** : 8 caractères suffisent, sans aucune exigence (`aaaaaaaa` est accepté). | `validators/schemas.js`, `pages/Register.jsx` | 12 caractères minimum dont une majuscule, une minuscule, un chiffre et un caractère spécial (recommandations ANSSI), vérifiés par l'API et par le formulaire. |
 
 > Point positif : les fichiers `.env` sont bien exclus du dépôt git (`.gitignore`), et les mots de passe sont hachés avec bcrypt.
 
@@ -58,6 +59,7 @@ Niveaux de gravité : 🔴 Critique · 🟠 Haute · 🟡 Moyenne · ⚪ Faible
 | B15 | 🟡 | **Erreurs serveur jamais affichées** à la commande (`response.error` n'existe pas avec axios) et pas de redirection après succès. | `pages/Order.js:66` | Affichage du message renvoyé par l'API. |
 | B16 | 🟡 | **Déconnexion incomplète** : le rôle reste dans `localStorage`. | `components/Navbar.js` | Appel à `/api/auth/logout` + nettoyage complet. |
 | B17 | ⚪ | URL de l'API codée en dur (`http://localhost:5000`) → impossible à déployer. Faute de frappe dans la route `/shippig_payment`. Fichier `components/ProductList.js` en double (copie de `ProtectedRoute`). | `services/*.js`, `App.js` | Variable d'environnement `VITE_API_URL` ; route `/shipping-payment` ; fichier supprimé. |
+| B21 | 🟡 | **Panier conservé après la déconnexion** : le panier, l'adresse de livraison et les choix de livraison/paiement restent affichés pour la personne suivante (fuite de données personnelles sur un poste partagé). | `components/Navbar.jsx`, `context/CartContext.jsx` | Réinitialisation complète du panier et des données de livraison à la déconnexion (action `RESET`). |
 
 ### Infrastructure / projet
 

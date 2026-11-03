@@ -2,6 +2,19 @@ import { createContext, useContext, useReducer } from 'react';
 
 const CartContext = createContext();
 
+// État vide du panier (utilisé au démarrage et à la déconnexion)
+const initialCartState = {
+  cart: [],
+  shippingMethod: '',
+  paymentMethod: '',
+  shippingAddress: {
+    street: '',
+    city: '',
+    postalCode: '',
+    country: '',
+  },
+};
+
 // Reducer pur : l'état existant n'est jamais modifié directement (React peut l'appeler deux fois)
 export const cartReducer = (state, action) => {
   switch (action.type) {
@@ -43,6 +56,10 @@ export const cartReducer = (state, action) => {
     case 'CLEAR_CART':
       return { ...state, cart: [] };
 
+    // Déconnexion : on efface aussi l'adresse et les choix de livraison/paiement (données personnelles)
+    case 'RESET':
+      return initialCartState;
+
     case 'SET_SHIPPING_METHOD':
       return { ...state, shippingMethod: action.payload };
 
@@ -58,17 +75,7 @@ export const cartReducer = (state, action) => {
 };
 
 export const CartProvider = ({ children }) => {
-  const [cartState, dispatch] = useReducer(cartReducer, {
-    cart: [],
-    shippingMethod: '',
-    paymentMethod: '',
-    shippingAddress: {
-      street: '',
-      city: '',
-      postalCode: '',
-      country: '',
-    },
-  });
+  const [cartState, dispatch] = useReducer(cartReducer, initialCartState);
 
   return <CartContext.Provider value={{ ...cartState, dispatch }}>{children}</CartContext.Provider>;
 };

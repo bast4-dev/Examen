@@ -5,11 +5,12 @@ import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const { cart } = useCart();
+  const { cart, dispatch } = useCart();
   const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout(); // supprime le cookie de session côté serveur
+    dispatch({ type: 'RESET' }); // vide le panier et les données de livraison du compte précédent
     navigate('/login');
   };
 

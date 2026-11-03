@@ -38,6 +38,7 @@ Les références (S1, B4…) renvoient au rapport d'audit [`docs/AUDIT.md`](docs
 - Frontend : méthode de livraison / paiement réellement enregistrée (option vide par défaut) (B10).
 - Frontend : la page d'administration ne plante plus en cas d'erreur API (B11) ; un stock peut être mis à 0 (B12).
 - Frontend : reducer du panier immuable (B13) ; clé React correcte dans la liste des produits (B14) ; messages d'erreur du serveur affichés (B15) ; déconnexion complète (B16).
+- Frontend : le panier, l'adresse de livraison et les choix de livraison/paiement sont effacés à la déconnexion (B21).
 - Frontend : URL de l'API configurable (`VITE_API_URL`) ; route `/shipping-payment` (faute de frappe) (B17).
 - Le code du frontend est désormais versionné dans le dépôt principal (dépôt git imbriqué supprimé) (B18).
 
