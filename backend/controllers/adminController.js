@@ -74,7 +74,9 @@ exports.validateOrder = async (req, res) => {
   );
   if (!order) {
     const exists = await Order.exists({ _id: id });
-    throw exists ? new HttpError(409, 'Seule une commande en attente peut être validée') : new HttpError(404, 'Commande non trouvée');
+    throw exists
+      ? new HttpError(409, 'Seule une commande en attente peut être validée')
+      : new HttpError(404, 'Commande non trouvée');
   }
 
   logger.info('Commande validée', { orderId: id, adminId: req.user.userId });

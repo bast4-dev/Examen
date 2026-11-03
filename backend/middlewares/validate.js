@@ -27,21 +27,23 @@ const messages = {
  * @param {'body'|'params'|'query'} [property='body'] - partie de la requête à valider
  * @returns {express.RequestHandler} répond 400 avec le détail des erreurs, sinon remplace req[property] par la valeur nettoyée
  */
-module.exports = (schema, property = 'body') => (req, res, next) => {
-  const { error, value } = schema.validate(req[property], {
-    abortEarly: false,
-    stripUnknown: true,
-    messages,
-    errors: { wrap: { label: false } },
-  });
-
-  if (error) {
-    return res.status(400).json({
-      message: 'Données invalides',
-      details: error.details.map((detail) => detail.message),
+module.exports =
+  (schema, property = 'body') =>
+  (req, res, next) => {
+    const { error, value } = schema.validate(req[property], {
+      abortEarly: false,
+      stripUnknown: true,
+      messages,
+      errors: { wrap: { label: false } },
     });
-  }
 
-  req[property] = value;
-  next();
-};
+    if (error) {
+      return res.status(400).json({
+        message: 'Données invalides',
+        details: error.details.map((detail) => detail.message),
+      });
+    }
+
+    req[property] = value;
+    next();
+  };

@@ -23,7 +23,9 @@ const ShippingMethodSelection = () => {
         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
       >
         {/* Option vide : la valeur affichée correspond toujours à l'état réel */}
-        <option value="" disabled>— Choisir —</option>
+        <option value="" disabled>
+          — Choisir —
+        </option>
         {shippingOptions.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}

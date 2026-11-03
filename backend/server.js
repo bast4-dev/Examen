@@ -32,7 +32,9 @@ app.use(requestLogger);
 // Sonde de supervision (uptime, état de la base)
 app.get('/api/health', (req, res) => {
   const dbUp = mongoose.connection.readyState === 1;
-  res.status(dbUp ? 200 : 503).json({ status: dbUp ? 'ok' : 'degraded', db: dbUp ? 'up' : 'down', uptime: Math.round(process.uptime()) });
+  res
+    .status(dbUp ? 200 : 503)
+    .json({ status: dbUp ? 'ok' : 'degraded', db: dbUp ? 'up' : 'down', uptime: Math.round(process.uptime()) });
 });
 
 app.use('/api/products', require('./routes/productRoutes'));
@@ -47,7 +49,9 @@ const PORT = process.env.PORT || 5000;
 
 connectDB()
   .then(() => {
-    app.listen(PORT, () => logger.info(`Serveur en écoute sur le port ${PORT}`, { env: process.env.NODE_ENV || 'development' }));
+    app.listen(PORT, () =>
+      logger.info(`Serveur en écoute sur le port ${PORT}`, { env: process.env.NODE_ENV || 'development' })
+    );
   })
   .catch((error) => {
     logger.error('Connexion MongoDB impossible, arrêt du serveur', { error: error.message });

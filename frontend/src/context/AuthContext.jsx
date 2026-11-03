@@ -1,7 +1,7 @@
 // src/context/AuthContext.jsx
 // État de session côté client. Le token reste dans un cookie HttpOnly : on ne stocke ici que
 // le nom et le rôle, utilisés pour l'affichage. Les droits sont toujours vérifiés par l'API.
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { fetchCurrentUser, login as apiLogin, logout as apiLogout } from '../services/api';
 
 const AuthContext = createContext(null);

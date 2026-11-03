@@ -4,6 +4,8 @@ const User = require('../models/User');
 const logger = require('../utils/logger');
 const HttpError = require('../utils/httpError');
 const { sendEmail } = require('../services/notificationService');
+// Traces de développement (DEBUG=app:*) : jamais de mot de passe ni de token
+const debug = require('debug')('app:auth');
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 heure
 
@@ -23,6 +25,7 @@ const cookieOptions = () => ({
  */
 exports.login = async (req, res) => {
   const { username, password } = req.body;
+  debug('Tentative de connexion : %s', username);
 
   const user = await User.findOne({ username });
   // Même réponse que l'utilisateur existe ou non (pas d'énumération des comptes)
@@ -36,6 +39,7 @@ exports.login = async (req, res) => {
     algorithm: 'HS256',
   });
 
+  debug('Jeton émis pour %s (rôle %s), valable %d min', user.username, user.role, TOKEN_TTL_MS / 60000);
   res.cookie('token', token, { ...cookieOptions(), maxAge: TOKEN_TTL_MS });
   logger.info('Connexion réussie', { userId: user._id, role: user.role });
   res.json({ username: user.username, role: user.role });

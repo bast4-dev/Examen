@@ -1,5 +1,5 @@
 // src/pages/ProductList.jsx
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchProducts } from '../services/api';
 import { getErrorMessage } from '../services/http';
 import { useCart } from '../context/CartContext';

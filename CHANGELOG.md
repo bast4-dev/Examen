@@ -48,6 +48,10 @@ Les références (S1, B4…) renvoient au rapport d'audit [`docs/AUDIT.md`](docs
 - Fichiers `.env.example` pour chaque service ; script racine `npm run install:all`.
 - Conteneurisation : un `Dockerfile` par service (utilisateur non-root, healthchecks), frontend servi par Nginx, `docker-compose.yml` complet (seuls le front et l'API sont exposés).
 - Intégration continue GitHub Actions : audit npm, build, vérification de syntaxe et test de la stack Docker à chaque push.
+- Qualité du code : ESLint 9 (configuration unique pour Node et React) et Prettier, vérifiés à chaque push dans le CI (`npm run lint`, `npm run format:check`).
+- Traces de développement avec le module `debug` (`npm run dev:debug` → `DEBUG=app:*`), sans aucune donnée sensible.
+- Rotation des journaux Docker en préproduction / production (3 × 10 Mo par conteneur).
+- Déploiement continu : `development` → préproduction, `main` → production (SSH, clé dédiée, vérification post-déploiement).
 - Documentation du code générée par JSDoc (`npm --prefix backend run docs` → `docs/code/backend/`) et `README.md` racine.
 
 ### Modifié

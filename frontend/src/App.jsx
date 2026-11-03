@@ -1,5 +1,4 @@
 // src/App.jsx
-import React from 'react';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import ProductList from './pages/ProductList';
@@ -50,11 +49,19 @@ const router = createBrowserRouter([
       },
       {
         path: 'order',
-        element: <ProtectedRoute><Order /></ProtectedRoute>,
+        element: (
+          <ProtectedRoute>
+            <Order />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'admin',
-        element: <AdminRoute><Admin /></AdminRoute>,
+        element: (
+          <AdminRoute>
+            <Admin />
+          </AdminRoute>
+        ),
       },
     ],
   },

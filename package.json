@@ -8,10 +8,21 @@
     "start:backend": "nodemon backend/server.js",
     "start:frontend": "npm --prefix frontend run dev",
     "start:all": "npm-run-all --parallel start:notifications start:stock-management start:gateway start:backend start:frontend",
-    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install && npm --prefix gateway install && npm --prefix microservices/notifications install && npm --prefix microservices/stock-management install"
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install && npm --prefix gateway install && npm --prefix microservices/notifications install && npm --prefix microservices/stock-management install",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
     "nodemon": "^3.1.14",
-    "npm-run-all2": "^9.0.4"
+    "npm-run-all2": "^9.0.4",
+    "prettier": "^3.9.10"
   }
 }

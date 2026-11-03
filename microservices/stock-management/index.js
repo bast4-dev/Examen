@@ -16,7 +16,9 @@ const LOW_STOCK_THRESHOLD = Number(process.env.LOW_STOCK_THRESHOLD) || 5;
 app.disable('x-powered-by');
 app.use(express.json({ limit: '5kb' }));
 
-app.get('/health', (req, res) => res.json({ status: 'ok', service: 'stock-management', uptime: Math.round(process.uptime()) }));
+app.get('/health', (req, res) =>
+  res.json({ status: 'ok', service: 'stock-management', uptime: Math.round(process.uptime()) })
+);
 
 const expectedKey = Buffer.from(process.env.INTERNAL_API_KEY);
 app.use((req, res, next) => {
@@ -37,9 +39,13 @@ app.post('/update-stock', (req, res) => {
     return res.status(400).json({ message: 'Stock invalide.' });
   }
 
-  console.log(JSON.stringify({ level: 'info', event: 'stock_updated', productId, stock, at: new Date().toISOString() }));
+  console.log(
+    JSON.stringify({ level: 'info', event: 'stock_updated', productId, stock, at: new Date().toISOString() })
+  );
   if (stock <= LOW_STOCK_THRESHOLD) {
-    console.warn(JSON.stringify({ level: 'warn', event: 'low_stock', productId, stock, threshold: LOW_STOCK_THRESHOLD }));
+    console.warn(
+      JSON.stringify({ level: 'warn', event: 'low_stock', productId, stock, threshold: LOW_STOCK_THRESHOLD })
+    );
   }
 
   res.json({ message: `Stock mis à jour pour le produit ${productId}`, lowStock: stock <= LOW_STOCK_THRESHOLD });

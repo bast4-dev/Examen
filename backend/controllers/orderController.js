@@ -6,6 +6,7 @@ const User = require('../models/User');
 const logger = require('../utils/logger');
 const HttpError = require('../utils/httpError');
 const { sendEmail, notifyStockUpdate } = require('../services/notificationService');
+const debug = require('debug')('app:order');
 
 /**
  * Réserve le stock de façon atomique : la mise à jour n'a lieu que si le stock est suffisant,
@@ -21,7 +22,10 @@ const reserveStock = async (productId, quantity) => {
     { $inc: { stock: -quantity } },
     { new: true }
   );
-  if (product) return product;
+  if (product) {
+    debug('Stock réservé : produit %s x%d (reste %d)', productId, quantity, product.stock);
+    return product;
+  }
 
   const exists = await Product.exists({ _id: productId });
   throw exists
@@ -35,7 +39,9 @@ const reserveStock = async (productId, quantity) => {
  * @returns {Promise<Array>}
  */
 const releaseStock = (reserved) =>
-  Promise.all(reserved.map(({ productId, quantity }) => Product.updateOne({ _id: productId }, { $inc: { stock: quantity } })));
+  Promise.all(
+    reserved.map(({ productId, quantity }) => Product.updateOne({ _id: productId }, { $inc: { stock: quantity } }))
+  );
 
 /**
  * Crée une commande : prix relus en base (jamais ceux du client), stock réservé,
@@ -53,6 +59,7 @@ exports.createOrder = async (req, res) => {
     quantities.set(productId, (quantities.get(productId) || 0) + quantity);
   }
 
+  debug('Nouvelle commande : %d produit(s) distinct(s)', quantities.size);
   const reserved = [];
   const reservedProducts = [];
   let order;
@@ -71,6 +78,7 @@ exports.createOrder = async (req, res) => {
     }));
     const total = Math.round(orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0) * 100) / 100;
 
+    debug('Total recalculé côté serveur : %d €', total);
     order = await Order.create({
       userId: req.user.userId,
       items: orderItems,

@@ -21,7 +21,12 @@ router.use(authenticateToken, isAdmin);
 router.get('/orders', asyncHandler(getOrders));
 
 // Changer l'état d'une commande
-router.put('/orders/:id/status', validate(schemas.idParam, 'params'), validate(schemas.orderStatus), asyncHandler(updateOrderStatus));
+router.put(
+  '/orders/:id/status',
+  validate(schemas.idParam, 'params'),
+  validate(schemas.orderStatus),
+  asyncHandler(updateOrderStatus)
+);
 
 // Valider une commande
 router.put('/orders/:id/validate', validate(schemas.idParam, 'params'), asyncHandler(validateOrder));
@@ -30,6 +35,11 @@ router.put('/orders/:id/validate', validate(schemas.idParam, 'params'), asyncHan
 router.get('/products', asyncHandler(getProducts));
 
 // Mettre à jour le stock d'un produit
-router.put('/products/:id/stock', validate(schemas.idParam, 'params'), validate(schemas.productStock), asyncHandler(updateProductStock));
+router.put(
+  '/products/:id/stock',
+  validate(schemas.idParam, 'params'),
+  validate(schemas.productStock),
+  asyncHandler(updateProductStock)
+);
 
 module.exports = router;

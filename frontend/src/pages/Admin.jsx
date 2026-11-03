@@ -1,26 +1,20 @@
 // src/pages/Admin.jsx
-import React, { useState, useEffect } from "react";
-import {
-  getOrders,
-  updateOrderStatus,
-  validateOrder,
-  getProducts,
-  updateProductStock,
-} from "../services/adminApi";
-import { getErrorMessage } from "../services/http";
+import { useState, useEffect } from 'react';
+import { getOrders, updateOrderStatus, validateOrder, getProducts, updateProductStock } from '../services/adminApi';
+import { getErrorMessage } from '../services/http';
 
 // Actions possibles selon le statut actuel d'une commande
 const NEXT_ACTIONS = {
-  "En attente": [{ label: "Valider la commande", validate: true, className: "bg-green-500" }],
-  "En cours de traitement": [{ label: 'Changer état à "Expédiée"', status: "Expédiée", className: "bg-blue-500" }],
-  "Expédiée": [{ label: 'Changer état à "Délivrée"', status: "Délivrée", className: "bg-blue-500" }],
+  'En attente': [{ label: 'Valider la commande', validate: true, className: 'bg-green-500' }],
+  'En cours de traitement': [{ label: 'Changer état à "Expédiée"', status: 'Expédiée', className: 'bg-blue-500' }],
+  Expédiée: [{ label: 'Changer état à "Délivrée"', status: 'Délivrée', className: 'bg-blue-500' }],
 };
-const CANCELLABLE = ["En attente", "En cours de traitement"];
+const CANCELLABLE = ['En attente', 'En cours de traitement'];
 
 const Admin = () => {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loadingOrder, setLoadingOrder] = useState(null);
   const [newStock, setNewStock] = useState({}); // Stock temporaire par produit
@@ -54,30 +48,28 @@ const Admin = () => {
   const handleOrderAction = async (orderId, action) => {
     setLoadingOrder(orderId); // Active le loader
     try {
-      const response = action.validate
-        ? await validateOrder(orderId)
-        : await updateOrderStatus(orderId, action.status);
+      const response = action.validate ? await validateOrder(orderId) : await updateOrderStatus(orderId, action.status);
       const updated = response.data.order;
 
       // Mettre à jour l'état local après une mise à jour réussie
       setOrders((prevOrders) => prevOrders.map((order) => (order._id === orderId ? updated : order)));
-      if (updated.status === "Annulée") await refreshProducts(); // le stock a été restitué
+      if (updated.status === 'Annulée') await refreshProducts(); // le stock a été restitué
 
       alert(`Statut de la commande ${orderId} mis à jour en "${updated.status}".`);
     } catch (err) {
-      alert(getErrorMessage(err, "Erreur lors de la mise à jour du statut de la commande."));
+      alert(getErrorMessage(err, 'Erreur lors de la mise à jour du statut de la commande.'));
     } finally {
       setLoadingOrder(null); // Désactive le loader
     }
   };
 
   const handleStockUpdate = async (productId) => {
-    const rawValue = newStock[productId] ?? ""; // Récupère la valeur saisie pour ce produit
+    const rawValue = newStock[productId] ?? ''; // Récupère la valeur saisie pour ce produit
     const stockValue = Number(rawValue);
 
     // 0 est une valeur valide (rupture de stock)
-    if (rawValue === "" || !Number.isInteger(stockValue) || stockValue < 0) {
-      alert("Veuillez entrer une quantité de stock valide (entier positif ou nul).");
+    if (rawValue === '' || !Number.isInteger(stockValue) || stockValue < 0) {
+      alert('Veuillez entrer une quantité de stock valide (entier positif ou nul).');
       return;
     }
 
@@ -90,9 +82,9 @@ const Admin = () => {
       setProducts((prev) => prev.map((product) => (product._id === productId ? response.data.product : product)));
 
       // Réinitialisation du champ
-      setNewStock({ ...newStock, [productId]: "" });
+      setNewStock({ ...newStock, [productId]: '' });
     } catch (err) {
-      alert(getErrorMessage(err, "Échec de la mise à jour du stock."));
+      alert(getErrorMessage(err, 'Échec de la mise à jour du stock.'));
     } finally {
       setUpdatingStock(null); // Désactive le loader
     }
@@ -100,7 +92,7 @@ const Admin = () => {
 
   return (
     <div className="p-8">
-      <h2 className="text-2xl font-bold mb-4">Page d'administration</h2>
+      <h2 className="text-2xl font-bold mb-4">Page d’administration</h2>
       {error && <p className="text-red-500 mb-4">{error}</p>}
 
       {/* Gestion des Commandes */}
@@ -123,15 +115,15 @@ const Admin = () => {
                   className={`${action.className} text-white px-2 py-1 mt-2 rounded mr-2 disabled:opacity-50`}
                   disabled={loadingOrder === order._id}
                 >
-                  {loadingOrder === order._id ? "Mise à jour..." : action.label}
+                  {loadingOrder === order._id ? 'Mise à jour...' : action.label}
                 </button>
               ))}
 
               {CANCELLABLE.includes(order.status) && (
                 <button
                   onClick={() =>
-                    window.confirm("Annuler cette commande ? Les produits seront remis en stock.") &&
-                    handleOrderAction(order._id, { status: "Annulée" })
+                    window.confirm('Annuler cette commande ? Les produits seront remis en stock.') &&
+                    handleOrderAction(order._id, { status: 'Annulée' })
                   }
                   className="bg-red-500 text-white px-2 py-1 mt-2 rounded mr-2 disabled:opacity-50"
                   disabled={loadingOrder === order._id}
@@ -140,10 +132,7 @@ const Admin = () => {
                 </button>
               )}
 
-              <button
-                onClick={() => setSelectedOrder(order)}
-                className="bg-gray-500 text-white px-2 py-1 mt-2 rounded"
-              >
+              <button onClick={() => setSelectedOrder(order)} className="bg-gray-500 text-white px-2 py-1 mt-2 rounded">
                 Détails
               </button>
             </li>
@@ -175,7 +164,7 @@ const Admin = () => {
                     placeholder="Nouveau stock"
                     min="0"
                     step="1"
-                    value={newStock[product._id] ?? ""}
+                    value={newStock[product._id] ?? ''}
                     className="border p-2 w-20"
                     onChange={(e) =>
                       setNewStock({
@@ -189,9 +178,7 @@ const Admin = () => {
                     className="bg-green-500 text-white px-2 py-1 ml-2 rounded"
                     disabled={updatingStock === product._id}
                   >
-                    {updatingStock === product._id
-                      ? "Mise à jour..."
-                      : "Mettre à jour"}
+                    {updatingStock === product._id ? 'Mise à jour...' : 'Mettre à jour'}
                   </button>
                 </td>
               </tr>
@@ -215,7 +202,7 @@ const Admin = () => {
               <strong>Total :</strong> {selectedOrder.total} €
             </p>
             <p>
-              <strong>Livraison :</strong> {selectedOrder.shippingMethod} — {selectedOrder.shippingAddress?.street},{" "}
+              <strong>Livraison :</strong> {selectedOrder.shippingMethod} — {selectedOrder.shippingAddress?.street},{' '}
               {selectedOrder.shippingAddress?.postalCode} {selectedOrder.shippingAddress?.city}
             </p>
             <p>
@@ -237,10 +224,7 @@ const Admin = () => {
                 </li>
               ))}
             </ul>
-            <button
-              onClick={() => setSelectedOrder(null)}
-              className="bg-red-500 text-white px-4 py-2 mt-4 rounded"
-            >
+            <button onClick={() => setSelectedOrder(null)} className="bg-red-500 text-white px-4 py-2 mt-4 rounded">
               Fermer
             </button>
           </div>

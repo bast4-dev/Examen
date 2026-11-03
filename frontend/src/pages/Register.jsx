@@ -1,5 +1,5 @@
 // src/pages/Register.jsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { register } from '../services/api';
 import { getErrorMessage } from '../services/http';
@@ -83,7 +83,9 @@ const Register = () => {
           onChange={handleChange}
           className="border border-gray-300 p-2 w-full mb-4"
         />
-        <button type="submit" className="bg-blue-500 text-white p-2 w-full rounded">S'inscrire</button>
+        <button type="submit" className="bg-blue-500 text-white p-2 w-full rounded">
+          S’inscrire
+        </button>
       </form>
     </div>
   );

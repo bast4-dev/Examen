@@ -7,7 +7,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 if (!process.env.INTERNAL_API_KEY) {
-  console.error("INTERNAL_API_KEY manquante : le gateway refuse de démarrer sans authentification");
+  console.error('INTERNAL_API_KEY manquante : le gateway refuse de démarrer sans authentification');
   process.exit(1);
 }
 

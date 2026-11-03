@@ -6,7 +6,6 @@ exports.notFound = (req, res) => {
 };
 
 // Middleware d'erreur centralisé : ne renvoie jamais le détail technique d'une erreur 500 au client
-// eslint-disable-next-line no-unused-vars
 exports.errorHandler = (err, req, res, next) => {
   let status = err.status || err.statusCode || 500;
   let message = err.message;

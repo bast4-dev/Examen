@@ -3,6 +3,7 @@
 // l'action métier (une commande reste valide même si l'e-mail ne part pas).
 const axios = require('axios');
 const logger = require('../utils/logger');
+const debug = require('debug')('app:notify');
 
 const gateway = axios.create({
   baseURL: process.env.GATEWAY_URL || 'http://localhost:8000',
@@ -17,6 +18,7 @@ const gateway = axios.create({
  */
 exports.sendEmail = async ({ to, subject, text }) => {
   if (!to) return;
+  debug("Envoi de l'e-mail « %s » via le gateway", subject);
   try {
     await gateway.post('/notify', { to, subject, text });
     logger.info('Notification e-mail envoyée', { subject });

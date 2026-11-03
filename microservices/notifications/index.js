@@ -6,7 +6,9 @@ require('dotenv').config();
 
 const { EMAIL_USER, EMAIL_APPLICATION_PASSWORD, INTERNAL_API_KEY } = process.env;
 if (!EMAIL_USER || !EMAIL_APPLICATION_PASSWORD || !INTERNAL_API_KEY) {
-  console.error('Configuration incomplète : EMAIL_USER, EMAIL_APPLICATION_PASSWORD et INTERNAL_API_KEY sont obligatoires');
+  console.error(
+    'Configuration incomplète : EMAIL_USER, EMAIL_APPLICATION_PASSWORD et INTERNAL_API_KEY sont obligatoires'
+  );
   process.exit(1);
 }
 
@@ -20,7 +22,9 @@ const transporter = nodemailer.createTransport({
   auth: { user: EMAIL_USER, pass: EMAIL_APPLICATION_PASSWORD },
 });
 
-app.get('/health', (req, res) => res.json({ status: 'ok', service: 'notifications', uptime: Math.round(process.uptime()) }));
+app.get('/health', (req, res) =>
+  res.json({ status: 'ok', service: 'notifications', uptime: Math.round(process.uptime()) })
+);
 
 // Défense en profondeur : la clé est revérifiée même derrière le gateway
 const expectedKey = Buffer.from(INTERNAL_API_KEY);

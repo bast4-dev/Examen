@@ -40,15 +40,28 @@ const createOrder = Joi.object({
   shippingAddress: Joi.object({
     street: Joi.string().trim().min(3).max(200).required().label('Rue'),
     city: Joi.string().trim().min(1).max(100).required().label('Ville'),
-    postalCode: Joi.string().trim().pattern(/^[0-9A-Za-z -]{3,10}$/).required().label('Code postal'),
+    postalCode: Joi.string()
+      .trim()
+      .pattern(/^[0-9A-Za-z -]{3,10}$/)
+      .required()
+      .label('Code postal'),
     country: Joi.string().trim().min(2).max(60).required().label('Pays'),
   }).required(),
-  paymentMethod: Joi.string().valid(...PAYMENT_METHODS).required().label('Mode de paiement'),
-  shippingMethod: Joi.string().valid(...SHIPPING_METHODS).required().label('Méthode de livraison'),
+  paymentMethod: Joi.string()
+    .valid(...PAYMENT_METHODS)
+    .required()
+    .label('Mode de paiement'),
+  shippingMethod: Joi.string()
+    .valid(...SHIPPING_METHODS)
+    .required()
+    .label('Méthode de livraison'),
 });
 
 const orderStatus = Joi.object({
-  status: Joi.string().valid(...ORDER_STATUSES).required().label('Statut'),
+  status: Joi.string()
+    .valid(...ORDER_STATUSES)
+    .required()
+    .label('Statut'),
 });
 
 const productStock = Joi.object({

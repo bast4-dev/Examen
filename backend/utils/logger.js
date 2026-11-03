@@ -15,7 +15,12 @@ const logger = winston.createLogger({
     new winston.transports.Console({
       format: isProduction ? combine(timestamp(), json()) : combine(colorize(), simple()),
     }),
-    new winston.transports.File({ filename: path.join(logDir, 'error.log'), level: 'error', maxsize: 5_000_000, maxFiles: 5 }),
+    new winston.transports.File({
+      filename: path.join(logDir, 'error.log'),
+      level: 'error',
+      maxsize: 5_000_000,
+      maxFiles: 5,
+    }),
     new winston.transports.File({ filename: path.join(logDir, 'combined.log'), maxsize: 5_000_000, maxFiles: 5 }),
   ],
 });
